@@ -1,6 +1,5 @@
 # Specified by me, WFF
 *.out
-*.parquet
 *.ipynb
 
 # Byte-compiled / optimized / DLL files
