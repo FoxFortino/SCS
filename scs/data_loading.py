@@ -1,18 +1,40 @@
+"""
+This script will generate a pandas dataframe from two lists of lnw files.
+
+This script is designed to be run from the command line. You can modify the
+hardcoded data directories and save directories. The defaults were appropriate
+for my file system but won't be for you. This script only needs to be run
+once.
+
+However, the result of this file `sn_data.parquet` should already exist in the
+directory data directory of this package.
+"""
 import os
+from os import getcwd
+from os.path import isdir
+from os.path import isfile
 from os.path import basename
 from os.path import splitext
+from os.path import join
+from os.path import abspath
+from glob import glob
 
 import numpy as np
-from numpy import typing as npt
 import pandas as pd
 
-import sn_config as snc
+import scs_config
 
 
-def remove_duplicate_lnw(
-    files_DASH: list,
-    files_SESN: list
-):
+def main(save_dir, data1_lnws, data2_lnws):
+    no_duplicate_lnw = dl.remove_duplicate_lnw(data1_lnws, data2_lnws)
+    no_bad_lnw = dl.remove_bad_sn(no_duplicate_lnw)
+    sn_data0 = dl.load_lnws(no_bad_lnw, save_dir)
+
+    sn_data_file = join(save_dir, "sn_data.parquet")
+    print(f"Dataframe saved to: {sn_data_file}")
+
+
+def remove_duplicate_lnw(files_DASH: list, files_SESN: list):
     # Loop through all files to look for duplicates between the SESN data and
     # the astrodash data. If there is a duplicate, keep the SNID one in the
     # list for no particular reason other than it is probably more updated.
@@ -32,19 +54,23 @@ def remove_duplicate_lnw(
             else:
                 no_duplicate_lnw.append(file)
 
-    print("Total number of SN .lnw files without duplicates: "
-          f"{len(no_duplicate_lnw)}")
+    print(
+        "Total number of SN .lnw files without duplicates: "
+        f"{len(no_duplicate_lnw)}"
+    )
     return no_duplicate_lnw
 
 
 def remove_bad_sn(no_duplicate_lnw):
     no_bad_lnw = []
     for lnw in no_duplicate_lnw:
-        if splitext(basename(lnw))[0] not in snc.ALL_BAD_SN:
+        if splitext(basename(lnw))[0] not in scs_config.ALL_BAD_SN:
             no_bad_lnw.append(lnw)
 
-    print("Total number of SN .lnw files without duplicates or bad SN: "
-          f"{len(no_bad_lnw)}")
+    print(
+        "Total number of SN .lnw files without duplicates or bad SN: "
+        f"{len(no_bad_lnw)}"
+    )
     return no_bad_lnw
 
 
@@ -52,7 +78,7 @@ def load_lnws(
     lnw_files: list[str],
     save_dir: str = None,
 ):
-    if (save_dir is not None) and (not os.path.isdir(save_dir)):
+    if (save_dir is not None) and (not isdir(save_dir)):
         raise FileNotFoundError(f"'{save_dir}' directory does not exist.")
 
     list_header = []
@@ -75,8 +101,8 @@ def load_lnws(
         list_sn_Stypes.append(loaded_data[5])
         list_sn_names.append(loaded_data[6])
 
-        Mtype_ids = snc.determine_ID_Stype_to_Mtype(loaded_data[4])
-        Mtypes = snc.get_Mtype_str_from_ID(Mtype_ids)
+        Mtype_ids = scs_config.determine_ID_Stype_to_Mtype(loaded_data[4])
+        Mtypes = scs_config.get_Mtype_str_from_ID(Mtype_ids)
 
         list_sn_Mtype_ids.append(Mtype_ids)
         list_sn_Mtypes.append(Mtypes)
@@ -91,42 +117,49 @@ def load_lnws(
     arr_sn_Mtype_ids = np.concatenate(list_sn_Mtype_ids, axis=0, dtype=int)
     arr_sn_Mtypes = np.concatenate(list_sn_Mtypes, axis=0)
 
-    df_sn_names = pd.Series(data=arr_sn_names,
-                            dtype="category",
-                            name="SN Name")
-    df_sn_Stypes = pd.Series(data=arr_sn_Stypes,
-                            dtype="category",
-                            name="SN Subtype")
-    df_sn_Stype_ids = pd.Series(data=arr_sn_Stype_ids,
-                               dtype="category",
-                               name="SN Subtype ID")
-    df_sn_Mtypes = pd.Series(data=arr_sn_Mtypes,
-                            dtype="category",
-                            name="SN Maintype")
-    df_sn_Mtype_ids = pd.Series(data=arr_sn_Mtype_ids,
-                               dtype="category",
-                               name="SN Maintype ID")
-    df_phases = pd.Series(data=arr_phases,
-                          dtype="float",
-                          name="Spectral Phase")
-    df_fluxes = pd.DataFrame(data=arr_fluxes,
-                             columns=list_wvl0[0].astype(str),
-                             dtype=float)
+    df_sn_names = pd.Series(
+        data=arr_sn_names, dtype="category", name="SN Name"
+    )
+    df_sn_Stypes = pd.Series(
+        data=arr_sn_Stypes, dtype="category", name="SN Subtype"
+    )
+    df_sn_Stype_ids = pd.Series(
+        data=arr_sn_Stype_ids, dtype="category", name="SN Subtype ID"
+    )
+    df_sn_Mtypes = pd.Series(
+        data=arr_sn_Mtypes, dtype="category", name="SN Maintype"
+    )
+    df_sn_Mtype_ids = pd.Series(
+        data=arr_sn_Mtype_ids, dtype="category", name="SN Maintype ID"
+    )
+    df_phases = pd.Series(
+        data=arr_phases, dtype="float", name="Spectral Phase"
+    )
+    df_fluxes = pd.DataFrame(
+        data=arr_fluxes, columns=list_wvl0[0].astype(str), dtype=float
+    )
 
-    df_data = pd.concat([df_sn_Stypes, df_sn_Stype_ids,
-                         df_sn_Mtypes, df_sn_Mtype_ids,
-                         df_phases, df_fluxes],
-                        axis=1)
+    df_data = pd.concat(
+        [
+            df_sn_Stypes,
+            df_sn_Stype_ids,
+            df_sn_Mtypes,
+            df_sn_Mtype_ids,
+            df_phases,
+            df_fluxes,
+        ],
+        axis=1,
+    )
     df_data.index = df_sn_names
 
     if save_dir is not None:
-        save_path = os.path.join(save_dir, "sn_data.parquet")
+        save_path = join(save_dir, "sn_data.parquet")
         df_data.to_parquet(save_path)
 
     return df_data
 
 
-def load_SNID_lnw(lnw_file: str) -> tuple:
+def load_SNID_lnw(lnw_file):
     """
     An adapted version of loadSNIDlnw from SESNspectraPCA.
 
@@ -180,8 +213,8 @@ def load_SNID_lnw(lnw_file: str) -> tuple:
     # Determine which of the 17 recognized supernova classes is sn_type. First
     # get the integer ID that represents this supernova type. Then convert
     # that back to the name for that type. It may be useful to have both.
-    sn_type_id = snc.SN_Stypes_str_to_int[header["sn_type"]]
-    sn_type = snc.SN_Stypes_int_to_str[sn_type_id]
+    sn_type_id = scs_config.SN_Stypes_str_to_int[header["sn_type"]]
+    sn_type = scs_config.SN_Stypes_int_to_str[sn_type_id]
 
     # Extract the phase of each spectra in this file.
     phases_line_number = len(lines) - header["num_wvl_bins"] - 1
@@ -203,7 +236,7 @@ def load_SNID_lnw(lnw_file: str) -> tuple:
 
     # Load the data at the bottom of the file and extract the wavelength array
     # and the flux data for each spectra corresponding to each phase.
-    data = np.loadtxt(lnw_file, skiprows=phases_line_number+1)
+    data = np.loadtxt(lnw_file, skiprows=phases_line_number + 1)
     wvl = np.take(data, 0, axis=1)
 
     # We take the transpose of this resulting matrix so that each row
@@ -214,9 +247,20 @@ def load_SNID_lnw(lnw_file: str) -> tuple:
 
 
 def load_sn_data(sn_data_file: os.PathLike) -> pd.DataFrame:
-    if not os.path.isfile(sn_data_file):
+    if not isfile(sn_data_file):
         raise FileNotFoundError(f"File '{sn_data_file}' does not exist.")
     sn_data = pd.read_parquet(sn_data_file)
     print(f"Loaded: {sn_data_file}")
     return sn_data
 
+
+if __name__ == "__main__":
+    DASH_data_dir = "/home/2649/repos/adfox/templates/training_set"
+    DASH_data_lnws = glob(join(DASH_data_dir, "*lnw"))
+
+    SESN_data_dir = "/home/2649/repos/SESNtemple/SNIDtemplates"
+    SESN_data_lnws = glob(join(SESN_data_dir, "templates_*/*lnw"))
+
+    save_dir = abspath(join(getcwd(), "../data"))
+
+    main(save_dir, DASH_data_lnws, SESN_data_lnws)

@@ -1,60 +1,91 @@
-from os.path import join
-
 from absl import app
 from absl import flags
 
+import sys
+from os import mkdir
+from os.path import join
+from os.path import isdir
+from shutil import rmtree
+
 import numpy as np
 from tensorflow import keras
-from tensorflow.keras import callbacks
-from tensorflow.keras import losses
-from tensorflow.keras import metrics
-from tensorflow.keras import optimizers
+from keras import callbacks
+from keras import losses
+from keras import metrics
+from keras import optimizers
+from keras import layers
+from keras import regularizers
 import tensorflow_addons as tfa
 
-import data_preparation as dp
 import data_loading as dl
+import data_preparation as dp
 import prepare_dataset
-
-import models
 import lr_schedules
+import hp_sets
+import module_flags
+
+FLAGS = flags.FLAGS
 
 
-default_hyper_parameters = {
-    "phase_range": (-20, 50),
-    "ptp_range": (0.1, 100),
-    "wvl_range": (4500, 7000),
-    "train_frac": 0.50,
-    "noise_scale": 0.25,
-    "spike_scale": 3,
-    "max_spikes": 5,
-    "random_state": 1415,
+def main(argv):
+    del argv
 
-    "lr0": 0.001,
-    "lr_schedule": "constant_lr",
+    R = FLAGS.R
+    hp_set = FLAGS.hp_set
 
-    "num_transformer_blocks": 6,
-    "num_heads": 8,
-    "key_dim": 64,
-    "kr_l2": 0,
-    "br_l2": 0,
-    "ar_l2": 0,
-    "dropout_attention": 0.1,
-    "dropout_projection": 0.1,
-    "filters": 4,
-    "num_feed_forward_layers": 1,
-    "feed_forward_layer_size": 1024,
-    "dropout_feed_forward": 0.1,
-}
+    # Check whether this function is being called as a batch job requeue. If it
+    # isn't, then set `restart_fit` to `True` so that the directories and data
+    # are made fresh.
+    restart_fit = True if (FLAGS.num_requeue == "") else False
+    print(f"`FLAGS.num_requeue`: {FLAGS.num_requeue}")
+    print(f"`restart_fit`: {restart_fit}")
+
+    # If the array_index is equal to or greater than the length of the
+    # parameter grid, then the array_index is out of bounds so we can terminate
+    # the program.
+    array_index = int(FLAGS.array_index)
+    PG = eval(f"hp_sets.{hp_set}()")
+    if array_index >= len(PG):
+        sys.exit(
+            f"Array index was {array_index} but Parameter Grid is size"
+            f" {len(PG)}."
+        )
+    hp = PG[int(array_index)]
+
+    # Construct the directories if they don't exist or delete them and recreate
+    # them if they do and `restart_fit` is `True`.
+    dir_model = join(FLAGS.dir_models, f"{R}_{hp_set}_{array_index}")
+    dir_backup = join(dir_model, "backup")
+    dir_model_data = join(dir_model, "data")
+    if isdir(dir_model) and restart_fit:
+        rmtree(dir_model)
+    mkdir(dir_model)
+    mkdir(dir_backup)
+    mkdir(dir_model_data)
+
+    file_trn = join(dir_model_data, f"sn_data_trn.RPA.parquet")
+    file_tst = join(dir_model_data, f"sn_data_tst.RP.parquet")
+
+    train(
+        R,
+        dir_model,
+        FLAGS.dir_raw,
+        dir_model_data,
+        file_trn,
+        file_tst,
+        hp,
+        restart_fit=restart_fit,
+        num_epochs=100000,
+        batch_size=32,
+        verbose=2,
+    )
 
 
 def train(
     R,
-    model_dir,
+    dir_model,
     data_dir_original,
-    data_dir_degraded,
-    data_dir_preprocessed,
-    data_dir_train_test,
-    data_dir_augmented,
+    dir_model_data,
     file_trn,
     file_tst,
     hp,
@@ -68,10 +99,10 @@ def train(
     prepare_dataset.prepare_dataset(
         R,
         sn_data_file,
-        data_dir_degraded,
-        data_dir_preprocessed,
-        data_dir_train_test,
-        data_dir_augmented,
+        dir_model_data,
+        dir_model_data,
+        dir_model_data,
+        dir_model_data,
         hp["phase_range"],
         hp["ptp_range"],
         hp["wvl_range"],
@@ -89,11 +120,12 @@ def train(
     df_trn = dl.load_sn_data(file_trn)
     df_tst = dl.load_sn_data(file_tst)
     dataset, num_wvl, num_classes = prepare_datasets_for_training(
-        df_trn, df_tst)
+        df_trn, df_tst
+    )
     Xtrn, Ytrn, Xtst, Ytst = dataset
 
     # Generate the model to be trained.
-    model = models.model_transformer(
+    model = model_transformer(
         input_shape=Xtrn.shape[1:],
         num_classes=num_classes,
         num_transformer_blocks=hp["num_transformer_blocks"],
@@ -107,16 +139,20 @@ def train(
         filters=hp["filters"],
         num_feed_forward_layers=hp["num_feed_forward_layers"],
         feed_forward_layer_size=hp["feed_forward_layer_size"],
-        dropout_feed_forward=hp["dropout_feed_forward"])
-
+        dropout_feed_forward=hp["dropout_feed_forward"],
+    )
 
     lr_schedule = lr_schedules.get_lr_schedule(hp)
-    callbacks = gen_callbacks(model_dir, lr_schedule)
+    callbacks = gen_callbacks(dir_model, lr_schedule)
 
     # Compile model with losses, metrics, and optimizer.
     loss = losses.CategoricalCrossentropy()
     acc = metrics.CategoricalAccuracy(name="ca")
-    f1 = tfa.metrics.F1Score(num_classes=num_classes, average="macro", name="f1")
+    f1 = tfa.metrics.F1Score(
+        num_classes=num_classes,
+        average="macro",
+        name="f1",
+    )
     opt = optimizers.Nadam(learning_rate=hp["lr0"])
     model.compile(loss=loss, optimizer=opt, metrics=[acc, f1])
     fit = model.fit(
@@ -126,14 +162,15 @@ def train(
         epochs=num_epochs,
         batch_size=batch_size,
         verbose=verbose,
-        callbacks=callbacks)
+        callbacks=callbacks,
+    )
 
     return fit
 
 
 def prepare_datasets_for_training(df_trn, df_tst):
     data_trn = dp.extract_dataframe(df_trn)
-    Xtrn = data_trn[6][... , None]
+    Xtrn = data_trn[6][..., None]
     Ytrn = data_trn[5]["SN Subtype ID"].to_numpy(dtype=int)
 
     num_wvl = Xtrn.shape[1]
@@ -149,13 +186,14 @@ def prepare_datasets_for_training(df_trn, df_tst):
     return (Xtrn, Ytrn, Xtst, Ytst), num_wvl, num_classes
 
 
-def gen_callbacks(model_dir, lr_schedule):
+def gen_callbacks(dir_model, lr_schedule):
     checkpoint = callbacks.ModelCheckpoint(
-        join(model_dir, "model.hdf5"),
+        join(dir_model, "model.hdf5"),
         monitor="val_loss",
         verbose=0,
         mode="min",
-        save_best_only=True)
+        save_best_only=True,
+    )
 
     early = callbacks.EarlyStopping(
         monitor="val_loss",
@@ -163,19 +201,82 @@ def gen_callbacks(model_dir, lr_schedule):
         patience=25,
         verbose=0,
         mode="min",
-        restore_best_weights=True)
+        restore_best_weights=True,
+    )
 
     logger = keras.callbacks.CSVLogger(
-        join(model_dir, "history.log"),
-        append=True)
+        join(dir_model, "history.log"),
+        append=True,
+    )
 
-    backup_dir = join(model_dir, "backup")
-    backup = callbacks.BackupAndRestore(
-        backup_dir=backup_dir)
+    backup_dir = join(dir_model, "backup")
+    backup = callbacks.BackupAndRestore(backup_dir=backup_dir)
 
     schedule = callbacks.LearningRateScheduler(lr_schedule)
 
     return [checkpoint, early, logger, backup, schedule]
+
+
+def model_transformer(
+    input_shape,
+    num_classes,
+    num_transformer_blocks,
+    num_heads,
+    key_dim,
+    kr_l2,
+    br_l2,
+    ar_l2,
+    dropout_attention,
+    dropout_projection,
+    filters,
+    num_feed_forward_layers,
+    feed_forward_layer_size,
+    dropout_feed_forward,
+):
+    inputs = keras.Input(shape=input_shape)
+
+    x = inputs
+    for _ in range(num_transformer_blocks):
+        sublayer_start = x
+        x = layers.LayerNormalization(epsilon=1e-6)(sublayer_start)
+        x = layers.MultiHeadAttention(
+            num_heads=num_heads,
+            key_dim=key_dim,
+            kernel_regularizer=regularizers.L2(kr_l2),
+            bias_regularizer=regularizers.L2(br_l2),
+            activity_regularizer=regularizers.L2(ar_l2),
+        )(x, x)
+        x = layers.Dropout(dropout_attention)(x)
+        sublayer_end = x + sublayer_start
+
+        x = layers.LayerNormalization(epsilon=1e-6)(sublayer_end)
+        x = layers.Conv1D(
+            filters=filters,
+            kernel_size=1,
+            activation="relu",
+            kernel_regularizer=regularizers.L2(kr_l2),
+            bias_regularizer=regularizers.L2(br_l2),
+            activity_regularizer=regularizers.L2(ar_l2),
+        )(x)
+        x = layers.Dropout(dropout_projection)(x)
+        x = layers.Conv1D(filters=input_shape[-1], kernel_size=1)(x)
+        x = sublayer_end + x
+
+    x = layers.GlobalMaxPooling1D(data_format="channels_first")(x)
+    for _ in range(num_feed_forward_layers):
+        x = layers.Dense(
+            feed_forward_layer_size,
+            activation="relu",
+            kernel_regularizer=regularizers.L2(kr_l2),
+            bias_regularizer=regularizers.L2(br_l2),
+            activity_regularizer=regularizers.L2(ar_l2),
+        )(x)
+        x = layers.Dropout(dropout_feed_forward)(x)
+
+    outputs = layers.Dense(num_classes, activation="softmax")(x)
+    model = keras.Model(inputs, outputs)
+
+    return model
 
 
 if __name__ == "__main__":

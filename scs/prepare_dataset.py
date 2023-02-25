@@ -51,78 +51,9 @@ import data_loading as dl
 import data_degrading as dd
 import data_preparation as dp
 import data_augmentation as da
-
+import model_flags
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer(
-    "R",
-    None,
-    "The spectroscopic resolution to degrade the data to.",
-    required=True)
-flags.DEFINE_string(
-    "data_dir_original",
-    "/home/2649/repos/SCS/data/",
-    "The absolute path for the directory where sn_data.parquet is currently located.")
-flags.DEFINE_string(
-    "data_dir_degraded",
-    "/home/2649/repos/SCS/data/",
-    "The absolute path for the directory where sn_data.C.parquet and sn_data.R.parquet is to be saved.")
-flags.DEFINE_string(
-    "data_dir_preprocessed",
-    "/home/2649/repos/SCS/data/",
-    "The absolute path for the directory where sn_data.CP.parquet and sn_data.RP.parquet is to be saved.")
-flags.DEFINE_string(
-    "data_dir_train_test",
-    "/home/2649/repos/SCS/data/",
-    "The absolute path for the directory where sn_data_trn.CP.parquet, sn_data_tst.CP.parquet, sn_data_trn.RP.parquet and sn_data_tst.CP.parquet is to be saved.")
-flags.DEFINE_string(
-    "data_dir_augmented",
-    "/home/2649/repos/SCS/data/",
-    "The absolute path for the directory where sn_data_trn.CPA.parquet and sn_data_trn.RPA.parquet is to be saved.")
-flags.DEFINE_float(
-    "phase_range_lower",
-    -20,
-    "The lower limit of spectral phases to be included in the dataset.")
-flags.DEFINE_float(
-    "phase_range_upper",
-    50,
-    "The upper limit of spectral phases to be included in the dataset.")
-flags.DEFINE_float(
-    "ptp_range_lower",
-    0.1,
-    "The lower limit of spectral ranges (flux_max - flux_min) to be included in the dataset.")
-flags.DEFINE_float(
-    "ptp_range_upper",
-    100,
-    "The upper limit of spectral ranges (flux_max - flux_min) to be included in the dataset.")
-flags.DEFINE_float(
-    "wvl_range_lower",
-    4500,
-    "The lower limit of wavelength ranges to be included in the dataset. Flux values corresponding to wavelengths beyond this range will be set to zero.")
-flags.DEFINE_float(
-    "wvl_range_upper",
-    7000,
-    "The upper limit of wavelength ranges to be included in the dataset. Flux values corresponding to wavelengths beyond this range will be set to zero.")
-flags.DEFINE_float(
-    "train_frac",
-    0.50,
-    "Fraction of the data to allocate for the training set. The rest will be reserved for the testing set.")
-flags.DEFINE_float(
-    "noise_scale",
-    0.25,
-    "The standard deviation of the noise to augment the data with. This number is a fraction of the standard deviation of the flux values in the data.")
-flags.DEFINE_float(
-    "spike_scale",
-    3,
-    "Scaling factor for the standard deviation of the spikes to augment the data with.")
-flags.DEFINE_integer(
-    "max_spikes",
-    5,
-    "Maximum number of spikes to augment a spectrum with.")
-flags.DEFINE_integer(
-    "random_state",
-    1415,
-    "NumPy random seed.")
 
 
 def main(argv):
@@ -165,44 +96,87 @@ def prepare_dataset(
     spike_scale: float,
     max_spikes: int,
     random_state: int = 1415,
-    redo_preprocess: bool = False,
-    redo_split: bool = False,
-    redo_augment: bool = False,
 ):
-    # TODO(FoxFortino): Revisit how all of these checks are formatted. Consider that asserts should only 
+    # TODO(FoxFortino): Revisit how all of these checks are formatted. Consider that asserts should only
     if not isfile(sn_data_original_file):
-        raise FileNotFoundError(f"The specified file '{sn_data_original_file}' for `sn_data_original_file` does not exist.")
+        raise FileNotFoundError(
+            f"The specified file '{sn_data_original_file}' for"
+            " `sn_data_original_file` does not exist."
+        )
     if not isdir(data_dir_degraded):
-        raise FileNotFoundError(f"The specified directory '{data_dir_degraded}' for `data_dir_degraded` does not exist.")
+        raise FileNotFoundError(
+            f"The specified directory '{data_dir_degraded}' for"
+            " `data_dir_degraded` does not exist."
+        )
     if not isdir(data_dir_preprocessed):
-        raise FileNotFoundError(f"The specified directory '{data_dir_preprocessed}' for `data_dir_preprocessed` does not exist.")
+        raise FileNotFoundError(
+            f"The specified directory '{data_dir_preprocessed}' for"
+            " `data_dir_preprocessed` does not exist."
+        )
     if not isdir(data_dir_train_test):
-        raise FileNotFoundError(f"The specified directory '{data_dir_train_test}' for `data_dir_train_test` does not exist.")
+        raise FileNotFoundError(
+            f"The specified directory '{data_dir_train_test}' for"
+            " `data_dir_train_test` does not exist."
+        )
     if not isdir(data_dir_augmented):
-        raise FileNotFoundError(f"The specified directory '{data_dir_augmented}' for `data_dir_augmented` does not exist.")
+        raise FileNotFoundError(
+            f"The specified directory '{data_dir_augmented}' for"
+            " `data_dir_augmented` does not exist."
+        )
 
     # Conformity of `phase_range`
-    assert (isinstance(phase_range, tuple)), f"`phase_range` must be a tuple but is {type(phase_range)}."
-    assert (len(phase_range) == 2), f"`phase_range` must be length 2 but is {len(phase_range)}."
-    assert (phase_range[0] < phase_range[1]), f"The first element of `phase_range` must be smaller than the second element but `phase_range` is {phase_range}."
+    assert isinstance(
+        phase_range, tuple
+    ), f"`phase_range` must be a tuple but is {type(phase_range)}."
+    assert (
+        len(phase_range) == 2
+    ), f"`phase_range` must be length 2 but is {len(phase_range)}."
+    assert phase_range[0] < phase_range[1], (
+        "The first element of `phase_range` must be smaller than the second"
+        f" element but `phase_range` is {phase_range}."
+    )
 
     # Conformity of `ptp_range`
-    assert (isinstance(ptp_range, tuple)), f"`ptp_range` must be a tuple but is {type(ptp_range)}."
-    assert (len(ptp_range) == 2), f"`ptp_range` must be length 2 but is {len(ptp_range)}."
-    assert (ptp_range[0] < ptp_range[1]), f"The first element of `ptp_range` must be smaller than the second element but `ptp_range` is {ptp_range}."
+    assert isinstance(
+        ptp_range, tuple
+    ), f"`ptp_range` must be a tuple but is {type(ptp_range)}."
+    assert (
+        len(ptp_range) == 2
+    ), f"`ptp_range` must be length 2 but is {len(ptp_range)}."
+    assert ptp_range[0] < ptp_range[1], (
+        "The first element of `ptp_range` must be smaller than the second"
+        f" element but `ptp_range` is {ptp_range}."
+    )
 
     # Conformity of `wvl_range`
-    assert (isinstance(wvl_range, tuple)), f"`wvl_range` must be a tuple but is {type(wvl_range)}."
-    assert (len(wvl_range) == 2), f"`wvl_range` must be length 2 but is {len(wvl_range)}."
-    assert (wvl_range[0] < wvl_range[1]), f"The first element of `wvl_range` must be smaller than the second element but `wvl_range` is {wvl_range}."
+    assert isinstance(
+        wvl_range, tuple
+    ), f"`wvl_range` must be a tuple but is {type(wvl_range)}."
+    assert (
+        len(wvl_range) == 2
+    ), f"`wvl_range` must be length 2 but is {len(wvl_range)}."
+    assert wvl_range[0] < wvl_range[1], (
+        "The first element of `wvl_range` must be smaller than the second"
+        f" element but `wvl_range` is {wvl_range}."
+    )
 
     # Conformity of `train_frac`
-    assert (isinstance(train_frac, float)), f"`train_frac` must be a float but is {type(train_frac)}."
-    assert (0 < train_frac < 1), f"`train_frac` must be between 0 and 1 but is {train_frac}."
+    assert isinstance(
+        train_frac, float
+    ), f"`train_frac` must be a float but is {type(train_frac)}."
+    assert (
+        0 < train_frac < 1
+    ), f"`train_frac` must be between 0 and 1 but is {train_frac}."
 
     # Conformity of `noise_scale`
-    assert (isinstance(noise_scale, float)), f"`noise_scale` must be a float but is {type(noise_scale)}."
-    assert (0 < noise_scale), f"`noise_scale` must be greater than 0 sssbut is {noise_scale}."
+    assert isinstance(
+        noise_scale, float
+    ), f"`noise_scale` must be a float but is {type(noise_scale)}."
+    assert (
+        0 < noise_scale
+    ), f"`noise_scale` must be greater than 0 sssbut is {noise_scale}."
+
+    # TODO(FoxFortino): Add assert statements for max_spikes and spike_scale
 
     rng = np.random.RandomState(random_state)
     df_original = dl.load_sn_data(sn_data_original_file)
@@ -227,7 +201,7 @@ def prepare_dataset(
         print()
 
     do_preprocess = True
-    if isfile(file_CP) and isfile(file_RP) and (not redo_preprocess):
+    if isfile(file_CP) and isfile(file_RP):
         do_preprocess = False  # Preprocessing already done
         df_CP = dl.load_sn_data(file_CP)
         df_RP = dl.load_sn_data(file_RP)
@@ -239,7 +213,6 @@ def prepare_dataset(
         and isfile(file_CP_tst)
         and isfile(file_RP_trn)
         and isfile(file_RP_tst)
-        and (not redo_split)
     ):
         do_split = False  # Train-test split already done
         df_CP_trn = dl.load_sn_data(file_CP_trn)
@@ -249,7 +222,7 @@ def prepare_dataset(
         print()
 
     do_augment = True
-    if isfile(file_CPA_trn) and isfile(file_RPA_trn) and (not redo_augment):
+    if isfile(file_CPA_trn) and isfile(file_RPA_trn):
         do_augment = False  # Data augmentation already done
         df_CPA_trn = dl.load_sn_data(file_CPA_trn)
         df_RPA_trn = dl.load_sn_data(file_RPA_trn)
@@ -263,14 +236,18 @@ def prepare_dataset(
     # after the fluxes have been rebinned to the new set of wavelengths
     # defined by the chose spectral resolution, R.
     if do_degrade:
-        print(f"Artificially degrading the following dataset to a spectral resolution of {R}:")
+        print(
+            "Artificially degrading the following dataset to a spectral"
+            f" resolution of {R}:"
+        )
         print(f"    {sn_data_original_file}")
         df_C, df_R = dd.degrade_dataframe(
             R,
             df_original,
             save_path_C=file_C,
-            save_path_R=file_R)
-        print(f"Degrading completed.")
+            save_path_R=file_R,
+        )
+        print("Degrading completed.")
         print()
 
     # Preprocess both of the dataframes from above and save them.
@@ -280,7 +257,7 @@ def prepare_dataset(
     # have a phase outside of `phase_range`, and remove spectra that have a
     # flux range (flux_max - flux_min) outside of `ptp_range`.
     if do_preprocess:
-        print(f"Preprocesing the following dataset files:")
+        print("Preprocesing the following dataset files:")
         print(f"    {file_C}")
         print(f"    {file_R}")
         df_CP = dp.preproccess_dataframe(
@@ -288,21 +265,26 @@ def prepare_dataset(
             phase_range=phase_range,
             ptp_range=ptp_range,
             wvl_range=wvl_range,
-            save_path=file_CP)
+            save_path=file_CP,
+        )
         df_RP = dp.preproccess_dataframe(
             df_R,
             phase_range=phase_range,
             ptp_range=ptp_range,
             wvl_range=wvl_range,
-            save_path=file_RP)
-        print(f"Preprocessing complete.")
+            save_path=file_RP,
+        )
+        print("Preprocessing complete.")
         print()
 
     # Perform the special train-test split on both the convolved and rebinned
     # datasets. NOTE THAT THE SPLIT WILL NOT NECCESSARILY BE THE SAME BETWEEN
     # THEM.
     if do_split:
-        print(f"Performing special train-test split on the following dataset files:")
+        print(
+            "Performing special train-test split on the following dataset"
+            " files:"
+        )
         print(f"    {file_CP}")
         print(f"    {file_RP}")
         df_CP_trn, df_CP_tst = dp.split_data(
@@ -310,13 +292,15 @@ def prepare_dataset(
             train_frac,
             rng,
             save_path_trn=file_CP_trn,
-            save_path_tst=file_CP_tst)
+            save_path_tst=file_CP_tst,
+        )
         df_RP_trn, df_RP_tst = dp.split_data(
             df_RP,
             train_frac,
             rng,
             save_path_trn=file_RP_trn,
-            save_path_tst=file_RP_tst,)
+            save_path_tst=file_RP_tst,
+        )
         print(f"Train-test split complete.")
         print()
 
@@ -332,7 +316,8 @@ def prepare_dataset(
             noise_scale=noise_scale,
             spike_scale=spike_scale,
             max_spikes=max_spikes,
-            save_path=file_CPA_trn)
+            save_path=file_CPA_trn,
+        )
         df_RPA_trn = da.augment(
             df_RP_trn,
             rng,
@@ -340,7 +325,8 @@ def prepare_dataset(
             noise_scale=noise_scale,
             spike_scale=spike_scale,
             max_spikes=max_spikes,
-            save_path=file_RPA_trn)
+            save_path=file_RPA_trn,
+        )
         print(f"Data augmentation complete.")
         print()
 

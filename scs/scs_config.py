@@ -1,7 +1,35 @@
 import numpy as np
 
 
-def determine_ID_Stype_to_Mtype(SN_Stype_ID: int) -> int:
+default_hyper_parameters = {
+    "phase_range": (-20, 50),
+    "ptp_range": (0.1, 100),
+    "wvl_range": (4500, 7000),
+    "train_frac": 0.50,
+    "noise_scale": 0.25,
+    "spike_scale": 3,
+    "max_spikes": 5,
+    "random_state": 1415,
+
+    "lr0": 0.001,
+    "lr_schedule": "constant_lr",
+
+    "num_transformer_blocks": 6,
+    "num_heads": 8,
+    "key_dim": 64,
+    "kr_l2": 0,
+    "br_l2": 0,
+    "ar_l2": 0,
+    "dropout_attention": 0.1,
+    "dropout_projection": 0.1,
+    "filters": 4,
+    "num_feed_forward_layers": 1,
+    "feed_forward_layer_size": 1024,
+    "dropout_feed_forward": 0.1,
+}
+
+
+def determine_ID_Stype_to_Mtype(SN_Stype_ID: int):
     """
     Given an SN subtype ID, return the maintype ID.
     """
@@ -20,7 +48,7 @@ determine_ID_Stype_to_Mtype = np.vectorize(determine_ID_Stype_to_Mtype,
                                            signature="()->()")
 
 
-def get_Mtype_str_from_ID(SN_Mtype_ID: int) -> str:
+def get_Mtype_str_from_ID(SN_Mtype_ID: int):
     """
     Given an SN maintype ID, return the string that corresponds to that type.
     """
@@ -39,7 +67,7 @@ get_Mtype_str_from_ID = np.vectorize(get_Mtype_str_from_ID,
                                      signature="()->()")
 
 
-def get_Mtype_ID_from_str(SN_Mtype: str) -> int:
+def get_Mtype_ID_from_str(SN_Mtype: str):
     """
     Given an SN maintype string, return the ID that corresponds to that type.
     """

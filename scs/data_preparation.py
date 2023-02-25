@@ -127,10 +127,7 @@ def split_data(
 
     return sn_data_trn, sn_data_tst
 
-# TODO(FoxFortino): consider train_frac might be good to be a kwarg and have a
-# default value. It might make sense for rng to be the last positional
-# argument since it appears in so many functions. Might be better for
-# uniformity.
+
 def df_split(x, train_frac, rng):
     x["Exclude"] = False
     x["Training Set"] = False
@@ -150,4 +147,3 @@ def df_split(x, train_frac, rng):
                       replace=False)
     x.loc[inds, "Training Set"] = True
     return x
-
