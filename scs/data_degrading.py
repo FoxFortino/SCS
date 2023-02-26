@@ -58,11 +58,11 @@ def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None):
 
 
 def degrade_spectrum(
-    R: float,
-    wvl0: npt.NDArray[float],
-    flux0: npt.NDArray[float],
-    wvl_range: tuple[float, float] = (2500, 10_000),
-) -> tuple:
+    R,
+    wvl0,
+    flux0,
+    wvl_range
+    ):
     """
     Degrade the spectral resolution of one spectrum (wvl0 and flux0) to R.
 
