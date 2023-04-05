@@ -61,7 +61,7 @@ def degrade_spectrum(
     R,
     wvl0,
     flux0,
-    wvl_range
+    wvl_range=(2500, 10_000),
     ):
     """
     Degrade the spectral resolution of one spectrum (wvl0 and flux0) to R.
