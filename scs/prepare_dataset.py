@@ -51,7 +51,7 @@ import data_loading as dl
 import data_degrading as dd
 import data_preparation as dp
 import data_augmentation as da
-import model_flags
+import module_flags
 
 FLAGS = flags.FLAGS
 
