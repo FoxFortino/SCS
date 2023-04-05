@@ -27,7 +27,7 @@ Model Development
     - Nail down an architecture for a simple feed-forward network
 
 2. Transformers
-    - Seeing that my changes to the network didn't seem to make any changes, try adding a convolutional layer right at the start to increase the dimensionality of the data from maybe (100, 1) to (100, N).
+    - Seeing that my changes to the network didn't seem to make any changes, try adding a convolutional layer right at the start to increase the dimensionality of the data from maybe (1, num_wavelengths) to (N, num_wavelengths).
     - Research other implementations of transformers for time series classification.
     - Investigate whether the full encoder-decoder structure of the transformer can be implemented for this task of time-series classification.
     - Try to run astronet code while varying the number of transformer blocks.
