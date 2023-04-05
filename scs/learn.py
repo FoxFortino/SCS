@@ -1,6 +1,7 @@
 from absl import app
 from absl import flags
 
+import json
 import sys
 from os import mkdir
 from os.path import join
@@ -66,7 +67,7 @@ def main(argv):
     file_trn = join(dir_model_data, f"sn_data_trn.RPA.parquet")
     file_tst = join(dir_model_data, f"sn_data_tst.RP.parquet")
 
-    train(
+    fit, results = train(
         R,
         dir_model,
         FLAGS.dir_raw,
@@ -79,6 +80,14 @@ def main(argv):
         batch_size=32,
         verbose=2,
     )
+
+    results_json = json.dumps(results, indent=4, sort_keys=True)
+    print(results)
+    results_file = join(dir_model, "results.json")
+    with open(results_file, "w") as f:
+        f.write(results_json)
+
+    return
 
 
 def train(
@@ -111,9 +120,6 @@ def train(
         hp["spike_scale"],
         hp["max_spikes"],
         random_state=hp["random_state"],
-        redo_preprocess=restart_fit,
-        redo_split=restart_fit,
-        redo_augment=restart_fit,
     )
 
     # Load the dataset.
@@ -125,8 +131,15 @@ def train(
     Xtrn, Ytrn, Xtst, Ytst = dataset
 
     # Generate the model to be trained.
-    model = model_transformer(
-        input_shape=Xtrn.shape[1:],
+    Xtrn = np.swapaxes(Xtrn, 1, 2)
+    Xtst = np.swapaxes(Xtst, 1, 2)
+    print(Xtrn.shape)
+    print(Ytrn.shape)
+    print(Xtst.shape)
+    print(Ytst.shape)
+
+    model = devmodel(
+        num_wvls=Xtrn.shape[2],
         num_classes=num_classes,
         num_transformer_blocks=hp["num_transformer_blocks"],
         num_heads=hp["num_heads"],
@@ -140,7 +153,9 @@ def train(
         num_feed_forward_layers=hp["num_feed_forward_layers"],
         feed_forward_layer_size=hp["feed_forward_layer_size"],
         dropout_feed_forward=hp["dropout_feed_forward"],
+        initial_projection=hp["initial_projection"],
     )
+    model.summary()
 
     lr_schedule = lr_schedules.get_lr_schedule(hp)
     callbacks = gen_callbacks(dir_model, lr_schedule)
@@ -165,7 +180,14 @@ def train(
         callbacks=callbacks,
     )
 
-    return fit
+    loss_trn, ca_trn, f1_trn = model.evaluate(x=Xtrn, y=Ytrn, verbose=2)
+    loss_tst, ca_tst, f1_tst = model.evaluate(x=Xtst, y=Ytst, verbose=2)
+    results = {
+        "trn": {"loss": loss_trn, "ca": ca_trn, "f1": f1_trn},
+        "tst": {"loss": loss_tst, "ca": ca_tst, "f1": f1_tst},
+    }
+
+    return fit, results
 
 
 def prepare_datasets_for_training(df_trn, df_tst):
@@ -217,8 +239,8 @@ def gen_callbacks(dir_model, lr_schedule):
     return [checkpoint, early, logger, backup, schedule]
 
 
-def model_transformer(
-    input_shape,
+def devmodel(
+    num_wvls,
     num_classes,
     num_transformer_blocks,
     num_heads,
@@ -232,37 +254,37 @@ def model_transformer(
     num_feed_forward_layers,
     feed_forward_layer_size,
     dropout_feed_forward,
+    initial_projection=None,
 ):
-    inputs = keras.Input(shape=input_shape)
-
+    inputs = keras.Input(shape=(1, num_wvls))
     x = inputs
-    for _ in range(num_transformer_blocks):
-        sublayer_start = x
-        x = layers.LayerNormalization(epsilon=1e-6)(sublayer_start)
-        x = layers.MultiHeadAttention(
-            num_heads=num_heads,
-            key_dim=key_dim,
-            kernel_regularizer=regularizers.L2(kr_l2),
-            bias_regularizer=regularizers.L2(br_l2),
-            activity_regularizer=regularizers.L2(ar_l2),
-        )(x, x)
-        x = layers.Dropout(dropout_attention)(x)
-        sublayer_end = x + sublayer_start
 
-        x = layers.LayerNormalization(epsilon=1e-6)(sublayer_end)
+    if initial_projection:
         x = layers.Conv1D(
-            filters=filters,
+            filters=initial_projection,
             kernel_size=1,
             activation="relu",
             kernel_regularizer=regularizers.L2(kr_l2),
             bias_regularizer=regularizers.L2(br_l2),
             activity_regularizer=regularizers.L2(ar_l2),
+            data_format="channels_first"
         )(x)
-        x = layers.Dropout(dropout_projection)(x)
-        x = layers.Conv1D(filters=input_shape[-1], kernel_size=1)(x)
-        x = sublayer_end + x
 
-    x = layers.GlobalMaxPooling1D(data_format="channels_first")(x)
+    for _ in range(num_transformer_blocks):
+        x = transformer_block(
+            x,
+            num_wvls,
+            num_heads,
+            key_dim,
+            kr_l2,
+            br_l2,
+            ar_l2,
+            dropout_attention,
+            dropout_projection,
+            filters,
+        )
+    x = layers.GlobalMaxPooling1D(data_format="channels_last")(x)
+
     for _ in range(num_feed_forward_layers):
         x = layers.Dense(
             feed_forward_layer_size,
@@ -277,6 +299,52 @@ def model_transformer(
     model = keras.Model(inputs, outputs)
 
     return model
+
+
+def transformer_block(
+    x,
+    num_wvls,
+    num_heads,
+    key_dim,
+    kr_l2,
+    br_l2,
+    ar_l2,
+    dropout_attention,
+    dropout_projection,
+    filters,
+):
+    x0 = layers.MultiHeadAttention(
+        num_heads=num_heads,
+        key_dim=key_dim,
+        attention_axes=1,
+        kernel_regularizer=regularizers.L2(kr_l2),
+        bias_regularizer=regularizers.L2(br_l2),
+        activity_regularizer=regularizers.L2(ar_l2),
+    )(x, x)
+    x0 = layers.Dropout(dropout_attention)(x0)
+    x0 = layers.Add()([x, x0])
+    x0 = layers.LayerNormalization()(x0)
+ 
+    x1 = layers.Conv1D(
+        filters=filters,
+        kernel_size=1,
+        activation="relu",
+        kernel_regularizer=regularizers.L2(kr_l2),
+        bias_regularizer=regularizers.L2(br_l2),
+        activity_regularizer=regularizers.L2(ar_l2)
+    )(x0)
+    x1 = layers.Conv1D(
+        filters=num_wvls,
+        kernel_size=1,
+        activation="relu",
+        kernel_regularizer=regularizers.L2(kr_l2),
+        bias_regularizer=regularizers.L2(br_l2),
+        activity_regularizer=regularizers.L2(ar_l2),
+    )(x1)
+    x1 = layers.Dropout(dropout_projection)(x1)
+    x1 = layers.Add()([x0 + x1])
+    x1 = layers.LayerNormalization()(x1)
+    return x1
 
 
 if __name__ == "__main__":
