@@ -40,7 +40,11 @@ def plot_specs(sn_data, ind, ncols=4, scale=4):
 
 def plot_loss(log, scale=8):
     fig, axes = plt.subplots(
-        2, 1, sharex=True, sharey=False, figsize=(scale * np.sqrt(2), scale),
+        2,
+        1,
+        sharex=True,
+        sharey=False,
+        figsize=(scale * np.sqrt(2), scale),
     )
     plt.subplots_adjust(hspace=0)
 
@@ -131,14 +135,12 @@ def plot_1D_results(mg, keys, vals, scale=8):
     retry_axis = keys.index("retry")
     del keys[retry_axis]
     del vals[retry_axis]
-    
+
     params = vals[0]
     param_name = keys[0]
 
     fig, axes = plt.subplots(
-        3, 1,
-        sharex=True, sharey=False,
-        figsize=(scale, scale * np.sqrt(2))
+        3, 1, sharex=True, sharey=False, figsize=(scale, scale * np.sqrt(2))
     )
     fig.subplots_adjust(hspace=0, wspace=0)
 
@@ -183,7 +185,6 @@ def plot_1D_results(mg, keys, vals, scale=8):
         )
 
         ax.legend(loc="center left")
-
 
     axes[-1].set_xlabel(param_name)
 
@@ -230,12 +231,13 @@ def wavelen2rgb(nm):
         rgb : 3-tuple
             tuple (red, green, blue) of integers in the range 0-255.
     """
+
     def adjust(color, factor):
         if color < 0.01:
             return 0
         max_intensity = 255
         gamma = 0.80
-        rv = int(round(max_intensity * (color * factor)**gamma))
+        rv = int(round(max_intensity * (color * factor) ** gamma))
         if rv < 0:
             return 0
         if rv > max_intensity:
@@ -248,7 +250,7 @@ def wavelen2rgb(nm):
         nm = 380
     if nm > 780:
         nm = 780
-    
+
     red = 0.0
     green = 0.0
     blue = 0.0
@@ -303,7 +305,7 @@ def plotSpec(wvl, flux, err=None, save=None):
     """
 
     if not np.any(wvl > 7000):
-        RGB = wavelen2rgb(wvl/10)
+        RGB = wavelen2rgb(wvl / 10)
         RGBA = np.array(RGB).T / 255
     else:
         # If there are wavelength points above 7000 angstroms, make them an
@@ -312,13 +314,15 @@ def plotSpec(wvl, flux, err=None, save=None):
         over7000 = np.where(wvl > 7000)[0]
         wvl_copy = wvl.copy()
         wvl_copy[over7000] = 7000
-        RGB = wavelen2rgb(wvl_copy/10)
+        RGB = wavelen2rgb(wvl_copy / 10)
         RGBA = np.array(RGB).T / 255
 
-    errmsg = ("flux and wvl arrays should be of same size but are "
-              f"{flux.size} and {wvl.size} respectively. Each flux value "
-              "should correspond to one wavelength bin. See docstring for "
-              "more info.")
+    errmsg = (
+        "flux and wvl arrays should be of same size but are "
+        f"{flux.size} and {wvl.size} respectively. Each flux value "
+        "should correspond to one wavelength bin. See docstring for "
+        "more info."
+    )
     assert wvl.size == flux.size, errmsg
 
     wvl_LE = adjust_logbins(wvl)
@@ -326,14 +330,19 @@ def plotSpec(wvl, flux, err=None, save=None):
     fig, ax = plt.subplots(figsize=(20, 10))
 
     if err is not None:
-        ax.errorbar(wvl[:-1], flux[:-1], yerr=err[:-1],
-                     elinewidth=1, capsize=3,
-                     ls="-", c="k", marker="*")
+        ax.errorbar(
+            wvl[:-1],
+            flux[:-1],
+            yerr=err[:-1],
+            elinewidth=1,
+            capsize=3,
+            ls="-",
+            c="k",
+            marker="*",
+        )
     else:
-        ax.plot(wvl[:-1], flux[:-1],
-                 ls="-", c="k", marker="*")
-    _, _, patches = ax.hist(wvl_LE[:-1], bins=wvl_LE,
-                             weights=flux[:-1], align="mid")
+        ax.plot(wvl[:-1], flux[:-1], ls="-", c="k", marker="*")
+    _, _, patches = ax.hist(wvl_LE[:-1], bins=wvl_LE, weights=flux[:-1], align="mid")
 
     # Each patch of the histogram (the rectangle underneath each point) gets
     # colored according to its central wavelength.
@@ -345,13 +354,13 @@ def plotSpec(wvl, flux, err=None, save=None):
 
     # bounds = flux.max() + flux.max()*0.05
     # ax.ylim((-bounds, bounds))
-    
+
     ax.set_ylim((0, 1.05))
-    
+
     ax.set_ylim((flux.min(), flux.max()))
     ax.set_xlim((3800, 7000))
 
-    ax.tick_params(axis='both', which='major', labelsize=30)
+    ax.tick_params(axis="both", which="major", labelsize=30)
     fig.tight_layout()
 
     if save is not None:
@@ -394,13 +403,57 @@ def adjust_logbins(bins, current="center", new="leftedge"):
         # Also note we need to add one more bin in log space before we take
         # np.diff. This is so that when we subtract arrays of the same shape
         # in the next line.
-        bin_radii = np.diff(logbin, append=logbin[-1]+d_logbin)
+        bin_radii = np.diff(logbin, append=logbin[-1] + d_logbin)
         new_logbins = logbin - bin_radii * 0.5
         new_bins = np.exp(new_logbins)
 
     elif current == "leftedge" and new == "center":
-        bin_widths = np.diff(logbin, append=logbin[-1]+d_logbin)
+        bin_widths = np.diff(logbin, append=logbin[-1] + d_logbin)
         new_logbins = logbin + bin_widths * 0.5
         new_bins = np.exp(new_logbins)
 
     return new_bins
+
+
+def plot_cm(
+    cm, classes, R, normalize=True, figsize=(12, 9), fontsize_offset=5, savepath=None
+):
+    """Normalize confusion matrix and set image parameters"""
+    cm = cm.astype("float") / np.nansum(cm, axis=1)[:, np.newaxis]
+    off_diag = ~np.eye(cm.shape[0], dtype=bool)
+    cm[off_diag] *= -1
+    vmin, vmax = -1, 1
+    cmap = "RdBu"
+
+    fig = plt.figure(figsize=figsize)
+    plt.imshow(cm, interpolation="None", cmap=cmap, vmin=vmin, vmax=vmax)
+
+    plt.title(f"R = {R}")
+
+    cb = plt.colorbar()
+    cb.ax.tick_params(labelsize=23 - fontsize_offset)
+
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=90, fontsize=15 - fontsize_offset)
+    plt.yticks(tick_marks, classes, fontsize=15 - fontsize_offset)
+
+    fmt = ".2f" if normalize else "d"
+    thresh = cm.max() / 2.0
+    import itertools
+
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(
+            j,
+            i,
+            format(abs(cm[i, j]), fmt),
+            horizontalalignment="center",
+            color="white" if abs(cm[i, j]) > thresh else "black",
+            fontsize=18 - fontsize_offset,
+        )
+
+    plt.tight_layout()
+    plt.ylabel("True label", fontsize=26 - fontsize_offset)
+    plt.xlabel("Predicted label", fontsize=26 - fontsize_offset)
+    plt.tight_layout()
+    # plt.savefig(savepath)
+    plt.show()
