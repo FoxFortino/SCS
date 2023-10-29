@@ -3,6 +3,178 @@ from sklearn.model_selection import ParameterGrid
 import numpy as np
 import scs_config as scsc
 
+default_hyper_parameters = {
+    "phase_range": (-20, 50),
+    "ptp_range": (0.1, 100),
+    "wvl_range": (4500, 7000),
+    "train_frac": 0.65,
+    "noise_scale": 0.1,
+    "spike_scale": 1.0,
+    "max_spikes": 3,
+    "random_state": None,
+    
+    "model_type": "feed_forward",
+    "add_dim": False,
+    "swap": False,
+    "units": [1024, 1024, 1024],
+    "activation": "relu",
+    "dropout": 0.1,
+    
+    # "model_type": "transformer_encoder",
+    # "add_dim": True,
+    # "swap": True,
+    # "encoder_blocks": 1,
+    # "encoder_heads": 8,
+    # "encoder_key_dim": 32,
+    # "encoder_proj_dim": 2048,
+    # "encoder_dropout_attention": 0.1,
+    # "encoder_dropout_projection": 0.1,
+    # "feed_forward_units": [1024, 1024, 1024],
+    # "feed_forward_activation": "relu",
+    # "feed_forward_dropout": 0.1,
+
+    "lr_schedule": "constant_lr",
+    "lr0": 1e-5,
+    "epochs": 10_000,
+    "batch_size": 32,
+}
+
+
+def T0():
+    """
+    
+    """
+    hp = deepcopy(default_hyper_parameters)
+
+    # ----- Change default values here ----- #
+    hp["model_type"] = "transformer_encoder"
+    hp["add_dim"] = True
+    hp["swap"] = True
+    hp["encoder_blocks"] = 1
+    hp["encoder_heads"] = 8
+    hp["encoder_key_dim"] = 32
+    hp["encoder_proj_dim"] = 512
+    hp["encoder_dropout_attention"] = 0.1
+    hp["encoder_dropout_projection"] = 0.1
+    hp["feed_forward_units"] = [1024, 1024, 1024]
+    hp["feed_forward_activation"] = "relu"
+    hp["feed_forward_dropout"] = 0.1
+
+    # ----- Reformat dictionary ----- #
+    hp = {key: [val] for key, val in hp.items()}
+
+    # ----- Add lists of values to try here ----- #
+    hp["retry"] = range(25)
+    hp["encoder_blocks"] = np.arange(8)
+
+    return ParameterGrid(hp)
+
+
+
+def ff_test1():
+    """
+    
+    """
+    hp = deepcopy(default_hyper_parameters)
+
+    # ----- Change default values here ----- #
+    hp["dropout"] = 0
+
+    # ----- Reformat dictionary ----- #
+    hp = {key: [val] for key, val in hp.items()}
+
+    # ----- Add lists of values to try here ----- #
+    hp["retry"] = range(20)
+    hp["units"] = [
+        [32], 2 * [32], 3 * [32], 4 * [32], 5 * [32], 
+        [64], 2 * [64], 3 * [64], 4 * [64], 5 * [64], 
+        [128], 2 * [128], 3 * [128], 4 * [128], 5 * [128], 
+        # [256], 2 * [b256], 3 * [256], 4 * [256], 5 * [256], 
+        # [512], 2 * [512], 3 * [512], 4 * [512], 5 * [512], 
+        # [1024], 2 * [1024], 3 * [1024], 4 * [1024], 5 * [1024], 
+    ]
+
+    return ParameterGrid(hp)
+
+
+def ff_test0():
+    """
+    Dropout doesn't seem to have a big impact here. Set it to 0 for future tests then try again once architecture is set.
+    
+    """
+    hp = deepcopy(default_hyper_parameters)
+
+    # ----- Change default values here ----- #s
+
+    # ----- Reformat dictionary ----- #
+    hp = {key: [val] for key, val in hp.items()}
+
+    # ----- Add lists of values to try here ----- #
+    hp["retry"] = range(25)
+    hp["dropout"] = [0, 0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
+
+    return ParameterGrid(hp)
+
+
+
+
+def newdev1():
+    """
+
+    """
+    hp = deepcopy(default_hyper_parameters)
+
+    # ----- Change default values here ----- #s
+    hp["train_frac"] = 0.65
+
+    # ----- Reformat dictionary ----- #
+    hp = {key: [val] for key, val in hp.items()}
+
+    # ----- Add lists of values to try here ----- #
+    hp["retry"] = range(25)
+    hp["dropout"] = [0, 0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
+    # hp["units"] = [
+    #     [32], 2 * [32], 3 * [32], 4 * [32], 5 * [32], 
+    #     [64], 2 * [64], 3 * [64], 4 * [64], 5 * [64], 
+    #     [128], 2 * [128], 3 * [128], 4 * [128], 5 * [128], 
+    #     [256], 2 * [256], 3 * [256], 4 * [256], 5 * [256], 
+    #     [512], 2 * [512], 3 * [512], 4 * [512], 5 * [512], 
+    #     [1024], 2 * [1024], 3 * [1024], 4 * [1024], 5 * [1024], 
+    # ]
+
+    return ParameterGrid(hp)
+
+
+
+
+def newdev0():
+    """
+
+    """
+    hp = deepcopy(default_hyper_parameters)
+
+    # ----- Change default values here ----- #
+    hp["lr0"] = 7.27895384e-04
+    hp["dropout"] = 0
+
+    # ----- Reformat dictionary ----- #
+    hp = {key: [val] for key, val in hp.items()}
+
+    # ----- Add lists of values to try here ----- #
+    hp["retry"] = range(25)
+    hp["train_frac"] = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
+    # hp["units"] = [
+    #     [32], 2 * [32], 3 * [32], 4 * [32], 5 * [32], 
+    #     [64], 2 * [64], 3 * [64], 4 * [64], 5 * [64], 
+    #     [128], 2 * [128], 3 * [128], 4 * [128], 5 * [128], 
+    #     [256], 2 * [256], 3 * [256], 4 * [256], 5 * [256], 
+    #     [512], 2 * [512], 3 * [512], 4 * [512], 5 * [512], 
+    #     [1024], 2 * [1024], 3 * [1024], 4 * [1024], 5 * [1024], 
+    # ]
+
+    return ParameterGrid(hp)
+
+
 
 def dev9():
     """

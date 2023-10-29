@@ -20,6 +20,8 @@ Model Development
 
 - Test only at R = 100 and lower. We know classification can be done at higher resolutions but let's stay focused at low R.
 
+- Batch hyperparameter testing results MUST be available as soon as the computation is complete. This will save so much time and prevent me from having to relearn everything every time I want to run it.
+
 
 
 ### Artificial Neural Networks
@@ -44,6 +46,9 @@ Model Development
         - Each sub-model for classifying maintype Ix should ahve an extra class that represents non-Ix subtypes. This way all of these sub-models can be trained on the entire dataset.
 
     - Add another channel alongside the spectrum which could contain anything. Maybe something like the hfft of the data?
+
+    - Wavelet transformation
+    
 
 
 Plotting and Misc.
@@ -74,6 +79,7 @@ Documentation and Support
 - Complete docstrings
 - Type annotations
 - Consider converting to poetry
+- absl-py is cool, but I think it will be better to use argparse and the standard logging module instead since it is more guaranteed to be supported by python and so there is one fewer dependency.
 
 Refactoring
 -----------
@@ -89,3 +95,11 @@ Refactoring
 3. Figure out the best way to organize all the functions again. Clearly separate data handling operations, machine learning operations, plotting poerations into their own folders.
     - I think object oriented is not worth it in this case. I think I can have learn.
 
+4. Consider removing all of the save kwargs
+
+5. Add verbosity arguments.
+    - But using print statements or the logger function
+
+6. Consider refactoring functions into as small of functions as I can. Consider te 5 lines of code rule.
+
+7. Figure out a neater way to handle file and directory creation, checking. Consider all of the model folders should be created with one function.

@@ -250,7 +250,6 @@ def load_sn_data(sn_data_file: os.PathLike) -> pd.DataFrame:
     if not isfile(sn_data_file):
         raise FileNotFoundError(f"File '{sn_data_file}' does not exist.")
     sn_data = pd.read_parquet(sn_data_file)
-    print(f"Loaded: {sn_data_file}")
     return sn_data
 
 
