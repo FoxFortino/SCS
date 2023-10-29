@@ -1,6 +1,5 @@
 # Specified by me, WFF
 *.out
-*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
