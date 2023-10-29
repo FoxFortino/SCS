@@ -1,5 +1,9 @@
-# Specified by me, WFF
+# WFF
+.DS_Store
+
+# WFF: Output files from job schedulers typically end in .out
 *.out
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
