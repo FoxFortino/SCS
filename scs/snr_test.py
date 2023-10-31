@@ -104,7 +104,7 @@ def get_model(input_shape, num_classes):
     )
 
 
-def main():
+def main(noise_scale_i):
     df_raw = load_original_dataset()
 
     rng = np.random.RandomState(1415)
@@ -189,3 +189,10 @@ def gen_noise(spectrum, noise_scale, rng):
 
 
 gen_noise = np.vectorize(gen_noise, signature="(n),(),()->(n)")
+
+
+if __name__ == "__main__":
+    print(sys.argv)
+    noise_scale_i = sys.argv[1]
+    main(noise_scale_i)
+    
