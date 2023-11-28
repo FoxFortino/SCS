@@ -23,16 +23,13 @@ Figures 5, 6 and 7 are all related. Will probably try to combine them into one f
 
 # Paper 2: Novel Classification Method For Supernova Subtype Classification
 
-![](SNe_over_time.jpg "Figure 1")
-### Figure 1: Same as in Paper 1
+### Figure 1: Same as in Paper 1. SNe over time. Motivates our development for improved SN classifiers.
 
-![](treemap.jpg "Figure 2")
-### Figure 2: Same as in Paper 1.
+### Figure 2: Same as in Paper 1. Treemap of dataset.
 
 ### Table 1: Breakdown of SNe types and how we've grouped them.
 
-![](sn1998dt_spectra.jpg "Figure 3")
-### Figure 3: Same as in Paper 1.
+### Figure 3: Same as in Paper 1. SN spectra at 3 different resolutions, providing context for why we are doing this entire analysis at R = 100.
 
 ### Figure 4: Transformer architecture
 
