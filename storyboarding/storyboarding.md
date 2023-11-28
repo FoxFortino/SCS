@@ -38,10 +38,8 @@ Figures 5, 6 and 7 are all related. Will probably try to combine them into one f
 
 ### Table 2: Model Parameters
 
-### Figure 5: Transformer training/validation loss curve at R = 100
+### Figure 5: Transformer and DASH training/validation loss curves at R = 100.
 
 ### Figure 6: Transformer CM vs corrected DASH CM at R = 100. All 16 subtypes included
 
 ### Figure 7: Transformer CM vs corrected DASH CM at R = 100. Aggregated SN types.
-
-
