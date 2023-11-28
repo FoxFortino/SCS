@@ -19,4 +19,29 @@
 
 ### Figure 7: F1-Score vs SNR and R, 2D plot.
 
+Figures 5, 6 and 7 are all related. Will probably try to combine them into one figure.
+
 # Paper 2: Novel Classification Method For Supernova Subtype Classification
+
+![](SNe_over_time.jpg "Figure 1")
+### Figure 1: Same as in Paper 1
+
+![](treemap.jpg "Figure 2")
+### Figure 2: Same as in Paper 1.
+
+### Table 1: Breakdown of SNe types and how we've grouped them.
+
+![](sn1998dt_spectra.jpg "Figure 3")
+### Figure 3: Same as in Paper 1.
+
+### Figure 4: Transformer architecture
+
+### Table 2: Model Parameters
+
+### Figure 5: Transformer training/validation loss curve at R = 100
+
+### Figure 6: Transformer CM vs corrected DASH CM at R = 100. All 16 subtypes included
+
+### Figure 7: Transformer CM vs corrected DASH CM at R = 100. Aggregated SN types.
+
+
