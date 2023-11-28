@@ -15,4 +15,8 @@
 ![](f1score.jpg "Figure 5")
 ### Figure 5: Seven different DASH performances on the testing set are plotted as a function of spectral resolution, R. The horizontal dashed line is the accuracy any model would have if it randomly predicted the subtype of each spectra. The horizontal dot-dashed line is the accuracy any model would have if it randomly predicted the broadtype of each spectra. Taking into account the 80/20 train/test split and the heavy class imbalance, these accuracies are 32.1% and 54.7%, respectively. The dotted line is the macro F1-score DASH achieves when predicting subtype. In a multi-class classification problem, the macro F1-score is the unweighted average of the F1-scores for each class. This unweighted average has the effect of prioritizing all of the classes equally in the metric, which is important for datasets with heavy class imbalance. The solid lines labelled ‘Ia’, ‘Ib’, ‘Ic’, and ‘II’ are the F1-scores (not macro F1-score) for each broadtype, respectively. Uncertainties for each point represent the average value of that metric over the final 1000 iterations during model training. We qualitatively identify R = 25 as the spectral resolution after which model F1-score begins to degrade. This indicates that spectroscopic subtype classification can be done accurately at resolutions lower than that of the SEDM.
 
+### Figure 6: F1-Score vs SNR, 1D plot.
+
+### Figure 7: F1-Score vs SNR and R, 2D plot.
+
 # Paper 2: Novel Classification Method For Supernova Subtype Classification
