@@ -52,6 +52,8 @@ Figures 5, 6 and 7 are all related. Will probably try to combine them into one f
 
 ### Table 2: Hyperparameters for the model, the training, and the preprocessing steps
 
+<img src="placeholder_loss_curve.jpg" alt="Figure 3" width="300"/>
+
 ### Figure 5: Transformer and DASH training/validation loss curves at R = 100.
 
 ### Figure 6+: Confusion Matrices for the various models
