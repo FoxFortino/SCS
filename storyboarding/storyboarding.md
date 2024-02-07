@@ -38,7 +38,7 @@ Figures 5, 6 and 7 are all related. Will probably try to combine them into one f
 
 <img src="Fig2_from_Villar_et_al_2023.png" alt="Figure 2" width="300"/>
 
-### Table 1 (or maybe a figure: Breakdown of SNe types and how we've grouped them.
+### Table 1 (or maybe a figure??): Right now this is Figure 2 from Villar et al 2023, the paper that discusses the hierarchical cross entropy loss. I am not sure how we should truly be re-categorizing the SNe so I am putting this here for now.
 
 <img src="sn1998dt_spectra.jpg" alt="Figure 3" width="300"/>
 
