@@ -1,12 +1,12 @@
 # Paper 1: Minimum Spectroscopic Resolution For Classifying Supernova Subtypes
 
-<img src="SNe_over_time.jpg" alt="Figure 1" width="500"/>
+<img src="SNe_over_time.jpg" alt="Figure 1" width="200"/>
 ### Figure 1: Each bar represents the total number of SNe discovered each year since SN1937D, a SN Ia in NGC 1003 (Baade & Zwicky 1938). Note the y-axis is in log-scale. The blue section denotes the SNe without spectral confirmation. The orange section denotes the SNe that were spectroscopically confirmed with one or two spectra. The red section denotes SNe that have been spectroscopically studied over time with more than two spectra. As the discovery rate of SNe grows, the rate of spectral classification of SNe does not keep up. The LSST will cause an unprecedented influx of new SNe that will only add to the stress on existing spectrograph facilities. The lack of spectrally studied SNe in recent years is likely due to publication delay. Data from the Open SN Catalog API gathered on August 4th, 2022 (we note this service is no longer maintained and recent data may be incomplete).
 
-<img src="treemap.jpg" alt="Figure 2" width="500"/>
+<img src="treemap.jpg" alt="Figure 2" width="200"/>
 ### Figure 2: A 'treemap' plot showing the number of spectra in our dataset for each SN type. The area of each rectangle is proportional to the number of spectra. Blue, orange, green and magenta rectangles denote SN spectra with broadtype Ia, Ib, Ic, and II, respectively.
 
-<img src="sn1998dt_spectra.jpg" alt="Figure 3" width="500"/>
+<img src="sn1998dt_spectra.jpg" alt="Figure 3" width="200"/>
 ### Figure 3: A spectrum from SN1998dt, Type Ib, observed 1.8 days after peak brightness. The blackbody continuum has been removed. Type Ib SNe do not show hydrogen spectral lines nor the Siii line at 6355A that characterizes SNe Ia. (Top) The spectrum is plotted at the original high-resolution of R = 738. (Middle) The spectrum is plotted at the low-resolution of R = 100, the same resolution that the SEDM operates at. (Bottom) The spectrum is plotted at the ultra low-resolution of R = 24.
 
 <img src="cm.jpg" alt="Figure 4" width="500"/>
