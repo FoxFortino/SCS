@@ -42,7 +42,7 @@ Figures 5, 6 and 7 are all related. Will probably try to combine them into one f
 
 <img src="sn1998dt_spectra.jpg" alt="Figure 3" width="300"/>
 
-### Figure 3: Same as in Paper 1. SN spectra at 3 different resolutions, providing context for why we are doing this entire analysis at R = 100.
+### Figure 3: A spectrum from SN1998dt, Type Ib, observed 1.8 days after peak brightness. The blackbody continuum has been removed. Type Ib SNe do not show hydrogen spectral lines nor the Siii line at 6355A that characterizes SNe Ia. (Top) The spectrum is plotted at the original high-resolution of R = 738. (Middle) The spectrum is plotted at the low-resolution of R = 100, the same resolution that the SEDM operates at. (Bottom) The spectrum is plotted at the ultra low-resolution of R = 24.
 
 ### Figure 4: Transformer architecture
 
