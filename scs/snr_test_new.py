@@ -1,0 +1,428 @@
+import sys
+from os.path import isfile
+
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sklearn.metrics import confusion_matrix
+from scipy.signal import savgol_filter
+
+from tensorflow.keras import callbacks
+from tensorflow.keras.losses import CategoricalCrossentropy
+from tensorflow.keras.metrics import CategoricalAccuracy
+from tensorflow.keras.optimizers import Nadam
+
+from tensorflow_addons.metrics import F1Score
+
+# My packages
+sys.path.insert(0, "../scs/")
+import data_degrading as dd
+import data_preparation as dp
+import data_augmentation as da
+from prepare_datasets_for_training import extract
+import data_plotting as dplt
+import scs_config
+
+sys.path.insert(0, "../scs/models/")
+import feed_forward
+import transformer_encoder
+
+
+
+def get_noise_scale_arr():
+    noise_scale_arr = np.linspace(0, 10, num=101)
+    return noise_scale_arr
+
+
+def load_original_dataset():
+    file_df_raw = "../data/raw/sn_data.parquet"
+    df_raw = pd.read_parquet(file_df_raw)
+    return df_raw
+
+
+
+def degrade_data(df_raw, R):
+    df_C, df_R = dd.degrade_dataframe(R, df_raw)
+    return df_C, df_R
+
+
+def clean_data(df_C, df_R, phase_range, ptp_range, wvl_range):
+    df_CP = dp.preproccess_dataframe(
+        df_C,
+        phase_range=phase_range,
+        ptp_range=ptp_range,
+        wvl_range=wvl_range,
+    )
+    df_RP = dp.preproccess_dataframe(
+        df_R,
+        phase_range=phase_range,
+        ptp_range=ptp_range,
+        wvl_range=wvl_range,
+    )
+    return df_CP, df_RP
+
+
+def split_train_test(df_CP, df_RP, train_frac, rng):
+    df_CP_trn, df_CP_tst = dp.split_data(df_CP, train_frac, rng)
+    df_RP_trn, df_RP_tst = dp.split_data(df_RP, train_frac, rng)
+    return df_CP_trn, df_CP_tst, df_RP_trn, df_RP_tst
+
+
+def augment_training_set(df_CP_trn, df_RP_trn, rng, wvl_range, spike_scale, max_spikes):
+    df_CPA_trn = da.augment(
+        df_CP_trn,
+        rng,
+        wvl_range=wvl_range,
+        noise_scale=0,
+        spike_scale=spike_scale,
+        max_spikes=max_spikes,
+    )
+    df_RPA_trn = da.augment(
+        df_RP_trn,
+        rng,
+        wvl_range=wvl_range,
+        noise_scale=0,
+        spike_scale=spike_scale,
+        max_spikes=max_spikes,
+    )
+    return df_CPA_trn, df_RPA_trn
+
+
+def get_model(input_shape, num_classes):
+    model = feed_forward.model(
+        input_shape,
+        num_classes,
+        [1024, 1024, 1024],
+        activation="relu",
+        dropout=0.1,
+    )
+
+
+
+def invertrfftfreq(x, bs):
+    """ this utility function helps making the x axis in the plots interpretable; invert rfft"""
+    N = len(x) * 2
+    if len(x) % 2:
+        return np.arange(0, max(x * N * bs) * 2, bs)
+    else:
+        return np.arange(0, max(x * N * bs) * 2 - 2 * bs, bs)
+
+def findpeak(x, y):
+    return np.argmax(y)
+
+
+
+def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge, 
+                                                    plot=False):
+    """this function contains functionality for noise extraction in common for the SNID and non SNID case"""
+    wvl_ln = np.log(wvl) #log base e
+    binsize = wvl_ln[-1] - wvl_ln[-2] #equal bin size in log space
+
+    f_bin, wln_bin = binspec(wvl_ln, flux, min(wvl_ln), max(wvl_ln), binsize) #binned spectrum
+    num_bin = len(f_bin) #
+
+    fbin_ft = np.fft.fft(f_bin) #*len(f_bin) # real fft of the binned spectrum
+    freq = np.fft.fftfreq(wln_bin.shape[0], binsize) # 1 / ln(wavelength)
+    indx = np.arange(1, freq.shape[0] // 2)
+    ps = np.abs(fbin_ft[indx]) # magnitude of the power spectrum = sqrt(P)
+    
+    
+    if plot:
+        plt.figure(1)
+        plt.plot(wvl_ln, flux)
+        plt.plot(wln_bin, f_bin, '--')
+        plt.title("spectrum")
+        plt.show()
+
+        plt.figure(2)
+        plt.plot(freq, fbin_ft)
+        plt.xlabel("frequency (1/ln(wavelength))")
+        plt.yscale('log')
+        plt.title("FFT")
+        plt.show()   
+    
+    # Dlambda/lambda = v/c 
+    freq_natural_units = freq / c_kms #* binsize
+        
+    num_upper = np.arange(len(freq))[1.0/freq * c_kms >= vel_toosmall][-1]
+    num_lower = np.arange(len(freq))[1.0/freq * c_kms <= vel_toolarge][0]
+    mag_avg = np.mean(ps[num_lower:num_upper])
+    
+    
+    #power spectrum in the signal region
+    xps = freq[num_lower:num_upper]
+    yps = ps[num_lower:num_upper]
+    
+    finite_mask = np.logical_not(ps==0)
+    finite_mask = np.logical_and(finite_mask, np.isfinite(ps))
+    if finite_mask.sum() == 0:
+        print("no good data points here")
+        return None, None, None, None, None, None, None, None, None 
+    
+    if plot:
+        
+        plt.figure(3)
+        plt.plot(freq[indx], ps)
+        plt.axvline(1.0 / (vel_toosmall / c_kms))
+        plt.axvline(1.0 / (vel_toolarge / c_kms))
+        plt.plot(freq[indx][finite_mask], 
+                 ps[finite_mask],  'c--')
+        plt.plot(xps, yps, color='r')
+        plt.xlabel("frequency (1/ln(wavelength))")
+        plt.title("power spectrum")
+        plt.yscale('log')
+        plt.ylabel("power")
+        plt.yscale('log')
+        plt.show()  
+     
+    powerlaw = lambda x, amp, exp: amp * x ** exp
+    
+    #TODO FBB: these should not be hard coded
+    exp_guess = 2 #*slope -hard coded atm
+    amp_guess = 800 #np.exp(intercept) hard coded atm
+    
+    ampfit, expfit = opt.curve_fit(
+        powerlaw,
+        freq[indx][finite_mask],
+        ps[finite_mask], #sigma=np.sqrt(freq[indx][finite_mask]),
+        p0=[amp_guess, exp_guess],
+    )[0]
+    
+    if plot:         
+        fig = plt.figure(5)
+        plt.axvline(1.0 / (vel_toosmall / c_kms))
+        plt.axvline(1.0 / (vel_toolarge / c_kms))
+        plt.plot(freq[indx][finite_mask],ps[finite_mask]) 
+        plt.plot(freq[indx][finite_mask], powerlaw(freq[indx][finite_mask], ampfit, expfit), 'k--')
+        plt.xticks(plt.xticks()[0], labels=["%d"%(t * binsize * c_kms) 
+                                            for t in plt.xticks()[0]], 
+                   rotation=45)       
+    #TODO FBB: this should be cleaner - ATM returning everything _and_ the kitchen sink
+
+    return mag_avg, ampfit, expfit, fbin_ft, wln_bin, xps, yps, freq, f_bin
+
+def smooth(wvl, flux, cut_vel, sv=None, plot=False, snidified=False):
+    c_kms = 299792.47 # speed of light in km/s
+    vel_toosmall = 3_000
+    vel_toolarge = 100_000
+    
+    #common preprocessing for SNID and non SNID spectra
+    mag_avg, ampfit, expfit, fbin_ft, wln_bin, xps, yps, freq, f_bin = preppowerlaw(wvl, flux, cut_vel, c_kms,
+                                                    vel_toosmall, vel_toolarge, 
+                                                    plot=plot)
+    if mag_avg == None: return wvl, flux, 0
+    
+    # find intersection of average fbin_ft magnitude and powerlaw fit to calculate
+    # separation velocity between signal and noise.
+    intersect_x = np.power((mag_avg / ampfit), 1.0 / expfit)
+    sep_vel = 1.0 / intersect_x * c_kms
+    
+    if sv: 
+        sep_vel = sv # allow sv to be passed as a user selected parameter - do that for SNID
+    if plot:
+        plt.figure(5)
+        plt.axvline(intersect_x, color='purple')
+        plt.xlabel("velocity")
+        
+        plt.plot([xps[0], xps[-1]], [mag_avg, mag_avg])
+        plt.ylabel("power")
+        plt.yscale('log')
+        plt.title("power law fit")
+        plt.show()
+
+    # filter out frequencies with velocities higher than sep_vel
+    smooth_fbin_ft = fbin_ft.copy()
+    noise_fbin_ft = fbin_ft.copy()
+    ind = np.arange(len(freq))[1.0/freq * c_kms >= sep_vel][-1]
+
+    noise_fbin_ft[:ind] = 0 
+    smooth_fbin_ft[ind:] = 0
+
+    smooth_fbin_ft_inv = np.real(np.fft.ifft(smooth_fbin_ft))
+    noise_fbin_ft_inv = np.real(np.fft.ifft(noise_fbin_ft))
+    
+    
+    #here is the split between SNIDified and non SNIDified spectra
+    if snidified:
+        amplitude = lambda y, amp: amp * y
+        mask = f_bin != 0
+             
+        ampfit = opt.curve_fit(
+        amplitude,
+        smooth_fbin_ft_inv[mask], 
+        f_bin[mask], #sigma=np.sqrt(freq[indx][finite_mask]),
+        p0=[2],
+    )[0]
+        smooth_fbin_ft_inv *= ampfit
+        smooth_fbin_ft_inv[~mask] = 0
+    else:
+        from scipy.interpolate import splrep, BSpline
+        tck = splrep(wln_bin[:smooth_fbin_ft_inv.shape[0]], 
+                 f_bin[:smooth_fbin_ft_inv.shape[0]] - smooth_fbin_ft_inv, s=9)
+        smooth_fbin_ft_inv += BSpline(*tck)(wln_bin[:smooth_fbin_ft_inv.shape[0]])
+    
+    if plot:
+        plt.figure(6)
+        plt.plot(wln_bin, f_bin, label="orig")
+        plt.plot(wln_bin, smooth_fbin_ft_inv, label="inverse")
+        if not snidified: 
+            plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], 
+                     BSpline(*tck)(wln_bin[:smooth_fbin_ft_inv.shape[0]]), label="correction")
+        
+        
+        plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], smooth_fbin_ft_inv, 'k', label="corrected")
+        plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], f_bin - noise_fbin_ft_inv, 'r--', 
+                 label="f-noise")
+        plt.legend()
+        plt.show()
+      
+    w_smoothed = np.exp(wln_bin[:smooth_fbin_ft_inv.shape[0]])
+   
+    f_smoothed = np.interp(wvl, w_smoothed, smooth_fbin_ft_inv)
+    
+    return w_smoothed, f_smoothed, sep_vel
+
+def binspec(wvl, flux, wstart, wend, wbin):
+    nlam = (wend - wstart) / wbin + 1
+    nlam = int(np.ceil(nlam))
+    outlam = np.arange(nlam) * wbin + wstart
+    answer = np.zeros(nlam)
+    interplam = np.unique(np.concatenate((wvl, outlam)))
+    interpflux = np.interp(interplam, wvl, flux)
+
+    for i in np.arange(0, nlam - 1):
+        cond = np.logical_and(interplam >= outlam[i], interplam <= outlam[i+1])
+        w = np.where(cond)
+        if len(w) == 2:
+            answer[i] = 0.5*(np.sum(interpflux[cond])*wbin)
+        else:
+            answer[i] = scipy.integrate.simps(interpflux[cond], interplam[cond])
+
+    answer[nlam - 1] = answer[nlam - 2]
+    cond = np.logical_or(outlam >= max(wvl), outlam < min(wvl))
+    answer[cond] = 0
+    return answer/wbin, outlam
+
+
+def get_noise(wvl, flux, snidified=False, sv=None, plot=False):
+
+        
+    cut_vel = 1_000 #km/s - min line velocoty for SN
+    #cut_vel_indx = np.argmax(flux)
+
+    w_smoothed, signal, sepv = smooth(wvl, flux, cut_vel, snidified=snidified, sv=sv, plot=plot)    
+    noise = flux - signal
+    if sepv == 0:
+        print("WARNING: failed on this SN")
+    
+    assert wvl == w_smoothed, "error in resampling spectra"
+    return signal
+
+
+def gen_noise(spectrum, noise_scale, rng):
+    if not scs_config.FILT:
+        smooth = get_noise()
+        
+    else:
+        smooth = savgol_filter(
+        spectrum,
+        11,
+        1,
+        mode="mirror",
+    )
+    res = spectrum - smooth
+    noise = res * noise_scale
+    return noise
+
+
+def inject_noise(df_raw, rng, noise_scale):
+    data = dp.extract_dataframe(df_raw)
+    index, wvl, flux_columns, metadata_columns, df_fluxes, df_metadata, fluxes = data
+    noise = np.vectorize(gen_noise, signature="(n),(),()->(n)")
+    fluxes_noise = fluxes + noise #(fluxes, noise_scale, rng)
+    df_raw[flux_columns] = fluxes_noise
+    return df_raw
+
+
+
+def main(noise_scale):
+    #noise scale should be 0-100
+    df_raw = load_original_dataset()
+
+    rng = np.random.RandomState(1415)
+    #noise_scale_arr = get_noise_scale_arr()
+    #noise_scale = noise_scale_arr[noise_scale_i]
+
+    df_raw = injec_noise(df_raw, rng, noise_scale)
+
+    R = 100
+    df_C, df_R = degrade_data(df_raw)
+
+    phase_range = (-20, 50)
+    ptp_range = (0.1, 100)
+    wvl_range = (4500, 7000)
+    df_CP, df_RP = clean_data(df_C, df_R)
+
+    train_frac = 0.50
+
+    df_CP_trn, df_CP_tst, df_RP_trn, df_RP_tst = split_train_test(
+        df_CP, df_RP, train_frac, rng
+    )
+
+    spike_scale = 3
+    max_spikes = 5
+    df_CPA_trn, df_RPA_trn = augment_training_set(
+        df_CP_trn, df_RP_trn, rng, wvl_range, spike_scale, max_spikes
+    )
+
+    Xtrn, Ytrn, num_trn, num_wvl, num_classes = extract(df_RPA_trn)
+    Xtst, Ytst, num_tst, num_wvl, num_classes = extract(df_RP_tst)
+
+    input_shape = Xtrn.shape[1:]
+    model = get_model(input_shape, num_classes)
+    model.summary()
+
+    lr0 = 1e-5
+    loss = CategoricalCrossentropy()
+    acc = CategoricalAccuracy(name="ca")
+    f1 = F1Score(num_classes=num_classes, average="macro", name="f1")
+    opt = Nadam(learning_rate=lr0)
+    model.compile(loss=loss, optimizer=opt, metrics=[acc, f1])
+
+    early = callbacks.EarlyStopping(
+        monitor="val_loss",
+        min_delta=0,
+        patience=10,
+        verbose=2,
+        mode="min",
+        restore_best_weights=True,
+    )
+    file_log = f"../data/snr_test/{noise_scale_i}_history.log"
+    logger = callbacks.CSVLogger(file_log, append=False)
+    cbs = [early, logger]
+
+    history = model.fit(
+        Xtrn,
+        Ytrn,
+        validation_data=(Xtst, Ytst),
+        epochs=10_000,
+        batch_size=32,
+        verbose=2,
+        callbacks=cbs,
+    )
+
+    loss_trn, ca_trn, f1_trn = model.evaluate(x=Xtrn, y=Ytrn, verbose=0)
+    loss_tst, ca_tst, f1_tst = model.evaluate(x=Xtst, y=Ytst, verbose=0)
+
+    results = f"{loss_trn},{ca_trn},{f1_trn},{loss_tst},{ca_tst},{f1_tst}\n"
+    with open("../data/snr_test/results.csv", "a") as f:
+        f.write(results)
+
+
+
+
+if __name__ == "__main__":
+    print(sys.argv)
+    noise_scale_i = sys.argv[1]
+    main(noise_scale_i)
+    
