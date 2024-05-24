@@ -22,15 +22,14 @@ import data_degrading as dd
 import data_preparation as dp
 import data_augmentation as da
 from prepare_datasets_for_training import extract
-import data_plotting as dplt
 import scs_config
 
 sys.path.insert(0, "../scs/models/")
 import feed_forward
 import transformer_encoder
 
-
-
+PLOT = False
+PLOT = True
 def get_noise_scale_arr():
     noise_scale_arr = np.linspace(0, 10, num=101)
     return noise_scale_arr
@@ -324,8 +323,8 @@ def get_noise(wvl, flux, snidified=False, sv=None, plot=False):
 def gen_noise(wvl, spectrum, noise_scale):
     if not scs_config.FILT:
         smooth = get_noise(wvl, spectrum, snidified= scs_config.SNIDIFIED,
-                           plot=False)
-        print("here")
+                           plot=PLOT)
+
     else:
         smooth = savgol_filter(
         spectrum,
@@ -333,35 +332,40 @@ def gen_noise(wvl, spectrum, noise_scale):
         1,
         mode="mirror",
     )
-    plt.plot(spectrum, label="spectrum")
-    plt.plot(smooth, label="spectrum")
-    plt.legend()
-    plt.show()
     res = spectrum - smooth
     noise = res * float(noise_scale)
-    plt.plot(noise, label="noise")
-    plt.legend()
-    plt.show()
+
+
+    if PLOT:
+        plt.plot(spectrum, label="spectrum")
+        plt.plot(smooth, label="spectrum")
+        plt.legend()
+        plt.show()
+        plt.plot(noise, label="noise")
+        plt.legend()
+        plt.show()
     return noise
 
 
-def inject_noise(df_raw, noise_scale):
+def inject_noise(df_raw, noise_scale, plot=False):
     data = dp.extract_dataframe(df_raw)
     index, wvl, flux_columns, metadata_columns, df_fluxes, df_metadata, fluxes = data
     vecnoise = np.vectorize(gen_noise, signature="(n),(n),()->(n)")
 
     noise = vecnoise([wvl] * 10,#df_raw.shape[0],
           fluxes[:10], noise_scale)
-    for i in range(1):
-        plt.plot(noise[i], label="noise")
-        plt.legend()
+    if plot:
+        for i in range(1):
+            plt.plot(noise[i], label="noise")
+            plt.legend()
 
-    plt.show()
+        plt.show()
 
     fluxes_noise = fluxes[:10] + noise #(fluxes, noise_scale, rng)
-    for i in range(10):
-        plt.plot(fluxes[i])
-        plt.plot(fluxes_noise[i])
+    if plot:
+        for i in range(10):
+            plt.plot(fluxes[i])
+            plt.plot(fluxes_noise[i])
 
     df_raw.iloc[:10].loc[:,flux_columns] = fluxes_noise
     return df_raw
@@ -372,24 +376,27 @@ def main(noise_scale):
     #noise scale should be 0-100
     df_raw = load_original_dataset()
 
-    plt.plot(df_raw.iloc[0, 5:], label="original")
-    plt.legend()
-    plt.show()
+    if PLOT:
+        plt.plot(df_raw.iloc[0, 5:], label="original")
+        plt.legend()
+        plt.show()
     rng = np.random.RandomState(1415)
     #noise_scale_arr = get_noise_scale_arr()
     #noise_scale = noise_scale_arr[noise_scale_i]
 
     df_raw = inject_noise(df_raw, noise_scale)
-    plt.plot(df_raw.iloc[0, 5:], label="degraded?")
-    plt.legend()
-    plt.show()
+    if PLOT:
+        plt.plot(df_raw.iloc[0, 5:], label="degraded?")
+        plt.legend()
+        plt.show()
 
 
     R = 100
     df_C, df_R = dd.degrade_dataframe(R, df_raw)
-    plt.plot(df_raw.iloc[0, 5:], label="degraded?")
-    plt.legend()
-    plt.show()
+    if PLOT:
+        plt.plot(df_raw.iloc[0, 5:], label="degraded?")
+        plt.legend()
+        plt.show()
 
     phase_range = (-20, 50)
     ptp_range = (0.1, 100)
@@ -401,7 +408,7 @@ def main(noise_scale):
     df_CP_trn, df_CP_tst, df_RP_trn, df_RP_tst = split_train_test(
         df_CP, df_RP, train_frac, rng
     )
-    print("here")
+
     spike_scale = 3
     max_spikes = 5
     print("augmentation")
@@ -454,9 +461,6 @@ def main(noise_scale):
     results = f"{loss_trn},{ca_trn},{f1_trn},{loss_tst},{ca_tst},{f1_tst}\n"
     with open("../data/snr_test/results.csv", "a") as f:
         f.write(results)
-
-
-
 
 if __name__ == "__main__":
     print("noise scale now:", sys.argv[1])
