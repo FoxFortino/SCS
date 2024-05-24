@@ -1,5 +1,9 @@
 import numpy as np
 
+FILT = True
+FILT = False
+SNIDIFIED = False
+SNIDIFIED = True
 
 default_hyper_parameters = {
     "phase_range": (-20, 50),

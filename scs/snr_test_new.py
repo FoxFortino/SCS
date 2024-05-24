@@ -4,8 +4,10 @@ from os.path import isfile
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from sklearn.metrics import confusion_matrix
+import scipy
 from scipy.signal import savgol_filter
+from scipy import stats as st
+from scipy import optimize as opt
 
 from tensorflow.keras import callbacks
 from tensorflow.keras.losses import CategoricalCrossentropy
@@ -41,9 +43,6 @@ def load_original_dataset():
 
 
 
-def degrade_data(df_raw, R):
-    df_C, df_R = dd.degrade_dataframe(R, df_raw)
-    return df_C, df_R
 
 
 def clean_data(df_C, df_R, phase_range, ptp_range, wvl_range):
@@ -96,6 +95,7 @@ def get_model(input_shape, num_classes):
         activation="relu",
         dropout=0.1,
     )
+    return model
 
 
 
@@ -110,6 +110,26 @@ def invertrfftfreq(x, bs):
 def findpeak(x, y):
     return np.argmax(y)
 
+def binspec(wvl, flux, wstart, wend, wbin):
+    nlam = (wend - wstart) / wbin + 1
+    nlam = int(np.ceil(nlam))
+    outlam = np.arange(nlam) * wbin + wstart
+    answer = np.zeros(nlam)
+    interplam = np.unique(np.concatenate((wvl, outlam)))
+    interpflux = np.interp(interplam, wvl, flux)
+
+    for i in np.arange(0, nlam - 1):
+        cond = np.logical_and(interplam >= outlam[i], interplam <= outlam[i+1])
+        w = np.where(cond)
+        if len(w) == 2:
+            answer[i] = 0.5*(np.sum(interpflux[cond])*wbin)
+        else:
+            answer[i] = scipy.integrate.simps(interpflux[cond], interplam[cond])
+
+    answer[nlam - 1] = answer[nlam - 2]
+    cond = np.logical_or(outlam >= max(wvl), outlam < min(wvl))
+    answer[cond] = 0
+    return answer/wbin, outlam
 
 
 def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge, 
@@ -119,7 +139,6 @@ def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge,
     binsize = wvl_ln[-1] - wvl_ln[-2] #equal bin size in log space
 
     f_bin, wln_bin = binspec(wvl_ln, flux, min(wvl_ln), max(wvl_ln), binsize) #binned spectrum
-    num_bin = len(f_bin) #
 
     fbin_ft = np.fft.fft(f_bin) #*len(f_bin) # real fft of the binned spectrum
     freq = np.fft.fftfreq(wln_bin.shape[0], binsize) # 1 / ln(wavelength)
@@ -233,7 +252,7 @@ def smooth(wvl, flux, cut_vel, sv=None, plot=False, snidified=False):
     # filter out frequencies with velocities higher than sep_vel
     smooth_fbin_ft = fbin_ft.copy()
     noise_fbin_ft = fbin_ft.copy()
-    ind = np.arange(len(freq))[1.0/freq * c_kms >= sep_vel][-1]
+    ind = np.arange(len(freq))[1.0 / freq * c_kms >= sep_vel][-1]
 
     noise_fbin_ft[:ind] = 0 
     smooth_fbin_ft[ind:] = 0
@@ -267,7 +286,8 @@ def smooth(wvl, flux, cut_vel, sv=None, plot=False, snidified=False):
         plt.plot(wln_bin, smooth_fbin_ft_inv, label="inverse")
         if not snidified: 
             plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], 
-                     BSpline(*tck)(wln_bin[:smooth_fbin_ft_inv.shape[0]]), label="correction")
+                     BSpline(*tck)(wln_bin[:smooth_fbin_ft_inv.shape[0]]),
+                     label="correction")
         
         
         plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], smooth_fbin_ft_inv, 'k', label="corrected")
@@ -276,32 +296,13 @@ def smooth(wvl, flux, cut_vel, sv=None, plot=False, snidified=False):
         plt.legend()
         plt.show()
       
-    w_smoothed = np.exp(wln_bin[:smooth_fbin_ft_inv.shape[0]])
+    w_smoothed = np.interp(wvl, np.exp(wln_bin),
+                           np.exp(wln_bin))
    
     f_smoothed = np.interp(wvl, w_smoothed, smooth_fbin_ft_inv)
     
     return w_smoothed, f_smoothed, sep_vel
 
-def binspec(wvl, flux, wstart, wend, wbin):
-    nlam = (wend - wstart) / wbin + 1
-    nlam = int(np.ceil(nlam))
-    outlam = np.arange(nlam) * wbin + wstart
-    answer = np.zeros(nlam)
-    interplam = np.unique(np.concatenate((wvl, outlam)))
-    interpflux = np.interp(interplam, wvl, flux)
-
-    for i in np.arange(0, nlam - 1):
-        cond = np.logical_and(interplam >= outlam[i], interplam <= outlam[i+1])
-        w = np.where(cond)
-        if len(w) == 2:
-            answer[i] = 0.5*(np.sum(interpflux[cond])*wbin)
-        else:
-            answer[i] = scipy.integrate.simps(interpflux[cond], interplam[cond])
-
-    answer[nlam - 1] = answer[nlam - 2]
-    cond = np.logical_or(outlam >= max(wvl), outlam < min(wvl))
-    answer[cond] = 0
-    return answer/wbin, outlam
 
 
 def get_noise(wvl, flux, snidified=False, sv=None, plot=False):
@@ -310,19 +311,21 @@ def get_noise(wvl, flux, snidified=False, sv=None, plot=False):
     cut_vel = 1_000 #km/s - min line velocoty for SN
     #cut_vel_indx = np.argmax(flux)
 
-    w_smoothed, signal, sepv = smooth(wvl, flux, cut_vel, snidified=snidified, sv=sv, plot=plot)    
-    noise = flux - signal
+    w_smoothed, signal, sepv = smooth(wvl, flux, cut_vel,
+                        snidified=snidified, sv=sv, plot=plot)
     if sepv == 0:
         print("WARNING: failed on this SN")
-    
-    assert wvl == w_smoothed, "error in resampling spectra"
+    if not (wvl == w_smoothed).all():
+        print("this will fail")
+    assert (wvl == w_smoothed).all(), "error in resampling spectra"
     return signal
 
 
-def gen_noise(spectrum, noise_scale, rng):
+def gen_noise(wvl, spectrum, noise_scale):
     if not scs_config.FILT:
-        smooth = get_noise()
-        
+        smooth = get_noise(wvl, spectrum, snidified= scs_config.SNIDIFIED,
+                           plot=False)
+        print("here")
     else:
         smooth = savgol_filter(
         spectrum,
@@ -330,17 +333,37 @@ def gen_noise(spectrum, noise_scale, rng):
         1,
         mode="mirror",
     )
+    plt.plot(spectrum, label="spectrum")
+    plt.plot(smooth, label="spectrum")
+    plt.legend()
+    plt.show()
     res = spectrum - smooth
-    noise = res * noise_scale
+    noise = res * float(noise_scale)
+    plt.plot(noise, label="noise")
+    plt.legend()
+    plt.show()
     return noise
 
 
-def inject_noise(df_raw, rng, noise_scale):
+def inject_noise(df_raw, noise_scale):
     data = dp.extract_dataframe(df_raw)
     index, wvl, flux_columns, metadata_columns, df_fluxes, df_metadata, fluxes = data
-    noise = np.vectorize(gen_noise, signature="(n),(),()->(n)")
-    fluxes_noise = fluxes + noise #(fluxes, noise_scale, rng)
-    df_raw[flux_columns] = fluxes_noise
+    vecnoise = np.vectorize(gen_noise, signature="(n),(n),()->(n)")
+
+    noise = vecnoise([wvl] * 10,#df_raw.shape[0],
+          fluxes[:10], noise_scale)
+    for i in range(1):
+        plt.plot(noise[i], label="noise")
+        plt.legend()
+
+    plt.show()
+
+    fluxes_noise = fluxes[:10] + noise #(fluxes, noise_scale, rng)
+    for i in range(10):
+        plt.plot(fluxes[i])
+        plt.plot(fluxes_noise[i])
+
+    df_raw.iloc[:10].loc[:,flux_columns] = fluxes_noise
     return df_raw
 
 
@@ -349,31 +372,44 @@ def main(noise_scale):
     #noise scale should be 0-100
     df_raw = load_original_dataset()
 
+    plt.plot(df_raw.iloc[0, 5:], label="original")
+    plt.legend()
+    plt.show()
     rng = np.random.RandomState(1415)
     #noise_scale_arr = get_noise_scale_arr()
     #noise_scale = noise_scale_arr[noise_scale_i]
 
-    df_raw = injec_noise(df_raw, rng, noise_scale)
+    df_raw = inject_noise(df_raw, noise_scale)
+    plt.plot(df_raw.iloc[0, 5:], label="degraded?")
+    plt.legend()
+    plt.show()
+
 
     R = 100
-    df_C, df_R = degrade_data(df_raw)
+    df_C, df_R = dd.degrade_dataframe(R, df_raw)
+    plt.plot(df_raw.iloc[0, 5:], label="degraded?")
+    plt.legend()
+    plt.show()
 
     phase_range = (-20, 50)
     ptp_range = (0.1, 100)
     wvl_range = (4500, 7000)
-    df_CP, df_RP = clean_data(df_C, df_R)
+    df_CP, df_RP = clean_data(df_C, df_R, phase_range, ptp_range, wvl_range)
 
     train_frac = 0.50
 
     df_CP_trn, df_CP_tst, df_RP_trn, df_RP_tst = split_train_test(
         df_CP, df_RP, train_frac, rng
     )
-
+    print("here")
     spike_scale = 3
     max_spikes = 5
+    print("augmentation")
+
     df_CPA_trn, df_RPA_trn = augment_training_set(
         df_CP_trn, df_RP_trn, rng, wvl_range, spike_scale, max_spikes
     )
+    print("train test split")
 
     Xtrn, Ytrn, num_trn, num_wvl, num_classes = extract(df_RPA_trn)
     Xtst, Ytst, num_tst, num_wvl, num_classes = extract(df_RP_tst)
@@ -401,6 +437,7 @@ def main(noise_scale):
     logger = callbacks.CSVLogger(file_log, append=False)
     cbs = [early, logger]
 
+    print("start training")
     history = model.fit(
         Xtrn,
         Ytrn,
@@ -422,7 +459,8 @@ def main(noise_scale):
 
 
 if __name__ == "__main__":
-    print(sys.argv)
+    print("noise scale now:", sys.argv[1])
     noise_scale_i = sys.argv[1]
+
     main(noise_scale_i)
     
