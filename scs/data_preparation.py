@@ -7,6 +7,18 @@ from numpy import typing as npt
 import pandas as pd
 
 
+def load_dataset(file_df):
+    df = pd.read_parquet(file_df)
+    return df
+
+def save_noise_dataset(data):
+    np.save("../data/raw/snnoise.npy", data)
+
+def read_noise_dataset():
+    return np.load("../data/raw/snnoise.npy")
+def save_clean_dataset(df):
+    df.to_parquet("../data/raw/sn_clean.parquet")
+
 def extract_dataframe(sn_data):
     """
     Extract both metadata and flux data from a dataframe.

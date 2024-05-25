@@ -1,13 +1,15 @@
 import sys
-from os.path import isfile
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
 import scipy
 from scipy.signal import savgol_filter
-from scipy import stats as st
 from scipy import optimize as opt
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 from tensorflow.keras import callbacks
 from tensorflow.keras.losses import CategoricalCrossentropy
@@ -26,22 +28,13 @@ import scs_config
 
 sys.path.insert(0, "../scs/models/")
 import feed_forward
-import transformer_encoder
+#import transformer_encoder
 
 PLOT = False
-PLOT = True
+#PLOT = True
 def get_noise_scale_arr():
     noise_scale_arr = np.linspace(0, 10, num=101)
     return noise_scale_arr
-
-
-def load_original_dataset():
-    file_df_raw = "../data/raw/sn_data.parquet"
-    df_raw = pd.read_parquet(file_df_raw)
-    return df_raw
-
-
-
 
 
 def clean_data(df_C, df_R, phase_range, ptp_range, wvl_range):
@@ -100,11 +93,12 @@ def get_model(input_shape, num_classes):
 
 def invertrfftfreq(x, bs):
     """ this utility function helps making the x axis in the plots interpretable; invert rfft"""
-    N = len(x) * 2
+    freq = np.fft.rfftfreq(len(x))
+    N = len(freq) * 2
     if len(x) % 2:
-        return np.arange(0, max(x * N * bs) * 2, bs)
+        return np.arange(0, max(freq * N * bs) * 2 , bs)
     else:
-        return np.arange(0, max(x * N * bs) * 2 - 2 * bs, bs)
+        return np.arange(0, max(freq * N * bs) * 2 - 2 * bs, bs)
 
 def findpeak(x, y):
     return np.argmax(y)
@@ -131,7 +125,7 @@ def binspec(wvl, flux, wstart, wend, wbin):
     return answer/wbin, outlam
 
 
-def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge, 
+def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge,
                                                     plot=False):
     """this function contains functionality for noise extraction in common for the SNID and non SNID case"""
     wvl_ln = np.log(wvl) #log base e
@@ -143,8 +137,8 @@ def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge,
     freq = np.fft.fftfreq(wln_bin.shape[0], binsize) # 1 / ln(wavelength)
     indx = np.arange(1, freq.shape[0] // 2)
     ps = np.abs(fbin_ft[indx]) # magnitude of the power spectrum = sqrt(P)
-    
-    
+
+
     if plot:
         plt.figure(1)
         plt.plot(wvl_ln, flux)
@@ -157,33 +151,33 @@ def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge,
         plt.xlabel("frequency (1/ln(wavelength))")
         plt.yscale('log')
         plt.title("FFT")
-        plt.show()   
-    
-    # Dlambda/lambda = v/c 
+        plt.show()
+
+    # Dlambda/lambda = v/c
     freq_natural_units = freq / c_kms #* binsize
-        
+
     num_upper = np.arange(len(freq))[1.0/freq * c_kms >= vel_toosmall][-1]
     num_lower = np.arange(len(freq))[1.0/freq * c_kms <= vel_toolarge][0]
     mag_avg = np.mean(ps[num_lower:num_upper])
-    
-    
+
+
     #power spectrum in the signal region
     xps = freq[num_lower:num_upper]
     yps = ps[num_lower:num_upper]
-    
+
     finite_mask = np.logical_not(ps==0)
     finite_mask = np.logical_and(finite_mask, np.isfinite(ps))
     if finite_mask.sum() == 0:
         print("no good data points here")
-        return None, None, None, None, None, None, None, None, None 
-    
+        return None, None, None, None, None, None, None, None, None
+
     if plot:
-        
+
         plt.figure(3)
         plt.plot(freq[indx], ps)
         plt.axvline(1.0 / (vel_toosmall / c_kms))
         plt.axvline(1.0 / (vel_toolarge / c_kms))
-        plt.plot(freq[indx][finite_mask], 
+        plt.plot(freq[indx][finite_mask],
                  ps[finite_mask],  'c--')
         plt.plot(xps, yps, color='r')
         plt.xlabel("frequency (1/ln(wavelength))")
@@ -191,30 +185,30 @@ def preppowerlaw(wvl, flux, cut_vel, c_kms, vel_toosmall, vel_toolarge,
         plt.yscale('log')
         plt.ylabel("power")
         plt.yscale('log')
-        plt.show()  
-     
+        plt.show()
+
     powerlaw = lambda x, amp, exp: amp * x ** exp
-    
+
     #TODO FBB: these should not be hard coded
     exp_guess = 2 #*slope -hard coded atm
     amp_guess = 800 #np.exp(intercept) hard coded atm
-    
+
     ampfit, expfit = opt.curve_fit(
         powerlaw,
         freq[indx][finite_mask],
         ps[finite_mask], #sigma=np.sqrt(freq[indx][finite_mask]),
         p0=[amp_guess, exp_guess],
     )[0]
-    
-    if plot:         
+
+    if plot:
         fig = plt.figure(5)
         plt.axvline(1.0 / (vel_toosmall / c_kms))
         plt.axvline(1.0 / (vel_toolarge / c_kms))
-        plt.plot(freq[indx][finite_mask],ps[finite_mask]) 
+        plt.plot(freq[indx][finite_mask],ps[finite_mask])
         plt.plot(freq[indx][finite_mask], powerlaw(freq[indx][finite_mask], ampfit, expfit), 'k--')
-        plt.xticks(plt.xticks()[0], labels=["%d"%(t * binsize * c_kms) 
-                                            for t in plt.xticks()[0]], 
-                   rotation=45)       
+        plt.xticks(plt.xticks()[0], labels=["%d"%(t * binsize * c_kms)
+                                            for t in plt.xticks()[0]],
+                   rotation=45)
     #TODO FBB: this should be cleaner - ATM returning everything _and_ the kitchen sink
 
     return mag_avg, ampfit, expfit, fbin_ft, wln_bin, xps, yps, freq, f_bin
@@ -223,25 +217,25 @@ def smooth(wvl, flux, cut_vel, sv=None, plot=False, snidified=False):
     c_kms = 299792.47 # speed of light in km/s
     vel_toosmall = 3_000
     vel_toolarge = 100_000
-    
+
     #common preprocessing for SNID and non SNID spectra
     mag_avg, ampfit, expfit, fbin_ft, wln_bin, xps, yps, freq, f_bin = preppowerlaw(wvl, flux, cut_vel, c_kms,
-                                                    vel_toosmall, vel_toolarge, 
+                                                    vel_toosmall, vel_toolarge,
                                                     plot=plot)
     if mag_avg == None: return wvl, flux, 0
-    
+
     # find intersection of average fbin_ft magnitude and powerlaw fit to calculate
     # separation velocity between signal and noise.
     intersect_x = np.power((mag_avg / ampfit), 1.0 / expfit)
     sep_vel = 1.0 / intersect_x * c_kms
-    
-    if sv: 
+
+    if sv:
         sep_vel = sv # allow sv to be passed as a user selected parameter - do that for SNID
     if plot:
         plt.figure(5)
         plt.axvline(intersect_x, color='purple')
         plt.xlabel("velocity")
-        
+
         plt.plot([xps[0], xps[-1]], [mag_avg, mag_avg])
         plt.ylabel("power")
         plt.yscale('log')
@@ -253,21 +247,21 @@ def smooth(wvl, flux, cut_vel, sv=None, plot=False, snidified=False):
     noise_fbin_ft = fbin_ft.copy()
     ind = np.arange(len(freq))[1.0 / freq * c_kms >= sep_vel][-1]
 
-    noise_fbin_ft[:ind] = 0 
+    noise_fbin_ft[:ind] = 0
     smooth_fbin_ft[ind:] = 0
 
     smooth_fbin_ft_inv = np.real(np.fft.ifft(smooth_fbin_ft))
     noise_fbin_ft_inv = np.real(np.fft.ifft(noise_fbin_ft))
-    
-    
+
+
     #here is the split between SNIDified and non SNIDified spectra
     if snidified:
         amplitude = lambda y, amp: amp * y
         mask = f_bin != 0
-             
+
         ampfit = opt.curve_fit(
         amplitude,
-        smooth_fbin_ft_inv[mask], 
+        smooth_fbin_ft_inv[mask],
         f_bin[mask], #sigma=np.sqrt(freq[indx][finite_mask]),
         p0=[2],
     )[0]
@@ -275,38 +269,38 @@ def smooth(wvl, flux, cut_vel, sv=None, plot=False, snidified=False):
         smooth_fbin_ft_inv[~mask] = 0
     else:
         from scipy.interpolate import splrep, BSpline
-        tck = splrep(wln_bin[:smooth_fbin_ft_inv.shape[0]], 
+        tck = splrep(wln_bin[:smooth_fbin_ft_inv.shape[0]],
                  f_bin[:smooth_fbin_ft_inv.shape[0]] - smooth_fbin_ft_inv, s=9)
         smooth_fbin_ft_inv += BSpline(*tck)(wln_bin[:smooth_fbin_ft_inv.shape[0]])
-    
+
     if plot:
         plt.figure(6)
         plt.plot(wln_bin, f_bin, label="orig")
         plt.plot(wln_bin, smooth_fbin_ft_inv, label="inverse")
-        if not snidified: 
-            plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], 
+        if not snidified:
+            plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]],
                      BSpline(*tck)(wln_bin[:smooth_fbin_ft_inv.shape[0]]),
                      label="correction")
-        
-        
+
+
         plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], smooth_fbin_ft_inv, 'k', label="corrected")
-        plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], f_bin - noise_fbin_ft_inv, 'r--', 
+        plt.plot(wln_bin[:smooth_fbin_ft_inv.shape[0]], f_bin - noise_fbin_ft_inv, 'r--',
                  label="f-noise")
         plt.legend()
         plt.show()
-      
+
     w_smoothed = np.interp(wvl, np.exp(wln_bin),
                            np.exp(wln_bin))
-   
+
     f_smoothed = np.interp(wvl, w_smoothed, smooth_fbin_ft_inv)
-    
+
     return w_smoothed, f_smoothed, sep_vel
 
 
 
 def get_noise(wvl, flux, snidified=False, sv=None, plot=False):
 
-        
+
     cut_vel = 1_000 #km/s - min line velocoty for SN
     #cut_vel_indx = np.argmax(flux)
 
@@ -320,7 +314,7 @@ def get_noise(wvl, flux, snidified=False, sv=None, plot=False):
     return signal
 
 
-def gen_noise(wvl, spectrum, noise_scale):
+def gen_noise(wvl, spectrum):
     if not scs_config.FILT:
         smooth = get_noise(wvl, spectrum, snidified= scs_config.SNIDIFIED,
                            plot=PLOT)
@@ -332,9 +326,7 @@ def gen_noise(wvl, spectrum, noise_scale):
         1,
         mode="mirror",
     )
-    res = spectrum - smooth
-    noise = res * float(noise_scale)
-
+    noise = spectrum - smooth
 
     if PLOT:
         plt.plot(spectrum, label="spectrum")
@@ -347,49 +339,55 @@ def gen_noise(wvl, spectrum, noise_scale):
     return noise
 
 
-def inject_noise(df_raw, noise_scale, plot=False):
-    data = dp.extract_dataframe(df_raw)
-    index, wvl, flux_columns, metadata_columns, df_fluxes, df_metadata, fluxes = data
-    vecnoise = np.vectorize(gen_noise, signature="(n),(n),()->(n)")
+def inject_noise(noise_scale, plot=False, recalculate=False):
+    #reads in data
+    if recalculate:
+        df = dp.load_dataset("../data/raw/sn_data.parquet")
+        #FBB cut for time
+        df = df.iloc[:10]
+        data = dp.extract_dataframe(df)
+        index, wvl, flux_columns, metadata_columns, df_fluxes, df_metadata, fluxes = data
 
-    noise = vecnoise([wvl] * 10,#df_raw.shape[0],
-          fluxes[:10], noise_scale)
-    if plot:
-        for i in range(1):
-            plt.plot(noise[i], label="noise")
-            plt.legend()
+        #vectorised operation to extract noise
+        vecnoise = np.vectorize(gen_noise, signature="(n),(n)->(n)")
+        noise = vecnoise([wvl] * fluxes.shape[0], fluxes)
+        if plot:
+            for i in range(1):
+                plt.plot(noise[i], label="noise")
+                plt.legend()
 
-        plt.show()
+            plt.show()
+        dp.save_noise_dataset(noise)
 
-    fluxes_noise = fluxes[:10] + noise #(fluxes, noise_scale, rng)
+        #generate clean spectra
+        fluxes = fluxes - noise
+        df.loc[:, flux_columns] = fluxes - noise
+
+        dp.save_clean_dataset(df_fluxes)
+
+    else:
+        df = dp.load_dataset("../data/raw/sn_clean.parquet")
+        df = df.iloc[:10]
+        noise = dp.read_noise_dataset()
+    #add noise to clean flux
+    fluxes_noise = fluxes + noise * float(noise_scale) # (fluxes, noise_scale, rng)
+
     if plot:
         for i in range(10):
             plt.plot(fluxes[i])
             plt.plot(fluxes_noise[i])
-
-    df_raw.iloc[:10].loc[:,flux_columns] = fluxes_noise
-    return df_raw
-
-
+    # reset df with modified flux
+    df.iloc[:noise.shape[0]].loc[:,flux_columns] = fluxes_noise
+    return df
 
 def main(noise_scale):
     #noise scale should be 0-100
-    df_raw = load_original_dataset()
-
-    if PLOT:
-        plt.plot(df_raw.iloc[0, 5:], label="original")
-        plt.legend()
-        plt.show()
-    rng = np.random.RandomState(1415)
-    #noise_scale_arr = get_noise_scale_arr()
-    #noise_scale = noise_scale_arr[noise_scale_i]
-
-    df_raw = inject_noise(df_raw, noise_scale)
+    df_raw = inject_noise(noise_scale, recalculate=True)
     if PLOT:
         plt.plot(df_raw.iloc[0, 5:], label="degraded?")
         plt.legend()
         plt.show()
-
+    rng = np.random.RandomState(1415)
 
     R = 100
     df_C, df_R = dd.degrade_dataframe(R, df_raw)
@@ -461,10 +459,16 @@ def main(noise_scale):
     results = f"{loss_trn},{ca_trn},{f1_trn},{loss_tst},{ca_tst},{f1_tst}\n"
     with open("../data/snr_test/results.csv", "a") as f:
         f.write(results)
+import unittest
+
+
+
+
+# msg="unit test for noise extraction routine failed")
 
 if __name__ == "__main__":
     print("noise scale now:", sys.argv[1])
     noise_scale_i = sys.argv[1]
-
+    unittest.main()
     main(noise_scale_i)
-    
+
