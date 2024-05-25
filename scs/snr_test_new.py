@@ -459,16 +459,9 @@ def main(noise_scale):
     results = f"{loss_trn},{ca_trn},{f1_trn},{loss_tst},{ca_tst},{f1_tst}\n"
     with open("../data/snr_test/results.csv", "a") as f:
         f.write(results)
-import unittest
-
-
-
-
-# msg="unit test for noise extraction routine failed")
 
 if __name__ == "__main__":
     print("noise scale now:", sys.argv[1])
     noise_scale_i = sys.argv[1]
-    unittest.main()
     main(noise_scale_i)
 
