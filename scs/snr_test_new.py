@@ -32,6 +32,8 @@ import feed_forward
 
 PLOT = False
 #PLOT = True
+TESTING = False
+TESTING = True
 def get_noise_scale_arr():
     noise_scale_arr = np.linspace(0, 10, num=101)
     return noise_scale_arr
@@ -344,7 +346,8 @@ def inject_noise(noise_scale, plot=False, recalculate=False):
     if recalculate:
         df = dp.load_dataset("../data/raw/sn_data.parquet")
         #FBB cut for time
-        df = df.iloc[:10]
+        if TESTING:
+            df = df.iloc[:10]
         data = dp.extract_dataframe(df)
         index, wvl, flux_columns, metadata_columns, df_fluxes, df_metadata, fluxes = data
 
@@ -367,7 +370,8 @@ def inject_noise(noise_scale, plot=False, recalculate=False):
 
     else:
         df = dp.load_dataset("../data/raw/sn_clean.parquet")
-        df = df.iloc[:10]
+        if TESTING:\
+            df = df.iloc[:10]
         noise = dp.read_noise_dataset()
     #add noise to clean flux
     fluxes_noise = fluxes + noise * float(noise_scale) # (fluxes, noise_scale, rng)
