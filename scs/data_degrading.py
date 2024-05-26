@@ -9,7 +9,8 @@ import pandas as pd
 import data_preparation as dp
 
 
-def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None):
+def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None,
+                      plot=False):
     if (save_path_C is not None) and (save_path_R is not None):
         if not isdir(dirname(save_path_R)):
             raise FileNotFoundError(f"Directory '{dirname(save_path_R)}' does not exist.")
@@ -27,7 +28,7 @@ def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None):
     df_metadata = data[5]  # Sub-dataframe containing only the metadata
     fluxes0 = data[6]  # Only the flux values in a numpy array
 
-    # Perform degradation for each spectrum in the dataset. The function
+    # Perform degradation (i.e. lowers resolution) for each spectrum in the dataset. The function
     # degraded_spectrum is vectorized, so supplying multiple spectrum allows
     # the operation to be parallelized.
     fluxes_convolve, wvl_degraded, fluxes_degraded = degrade_spectrum(
@@ -53,7 +54,12 @@ def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None):
         print(f"Saved: {save_path_C}")
         sn_data_degraded.to_parquet(save_path_R)
         print(f"Saved: {save_path_R}")
-
+    if plot:
+        plt.plot(degraded_flux_columns, sn_data_convolve.iloc[:1, flux0_columns],
+                 label="convolved")
+        plt.plot(degraded_flux_columns, sn_data_degraded.iloc[:1, flux0_columns],
+             label="lower res")
+        plt.show()
     return sn_data_convolve, sn_data_degraded
 
 
