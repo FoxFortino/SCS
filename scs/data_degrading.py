@@ -56,10 +56,12 @@ def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None,
         print(f"Saved: {save_path_R}")
     if plot:
         import matplotlib.pylab as plt
-        plt.plot(degraded_flux_columns, sn_data_convolve.iloc[:1, flux0_columns],
+        plt.plot(degraded_flux_columns.astype(float),
+                 sn_data_convolve.iloc[:1, flux0_columns],
                  label="convolved")
-        plt.plot(degraded_flux_columns, sn_data_degraded.iloc[:1, flux0_columns],
-             label="lower res")
+        plt.plot(degraded_flux_columns.astype(float),
+                 sn_data_degraded.iloc[:1, flux0_columns],
+                 label="lower res")
         plt.show()
     return sn_data_convolve, sn_data_degraded
 
