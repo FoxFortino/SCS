@@ -70,12 +70,8 @@ def preproccess_dataframe(
     # The function below neatly and reproducibly extracts all of the relevant 
     # subsets of the dataframe.
     data = extract_dataframe(sn_data)
-    index = data[0]  # SN Name for each spectrum
     wvl0 = data[1]  # Wavelength array
     flux0_columns = data[2]  # Columns that index the fluxes in the dataframe
-    metadata_columns = data[3]  # Columns that index the metadata
-    df_fluxes0 = data[4]  # Sub-dataframe containing only the fluxes
-    df_metadata = data[5]  # Sub-dataframe containing only the metadata
     fluxes0 = data[6]  # Only the flux values in a numpy array
 
     # Spectra with a spectral phase outside of `phase_range`.
