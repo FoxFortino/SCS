@@ -189,3 +189,13 @@ def gen_noise(spectrum, noise_scale, rng):
 
 
 gen_noise = np.vectorize(gen_noise, signature="(n),(),()->(n)")
+
+
+long_str = (
+    "Hello take a look at this long ass string omg take a look at this "
+    "string its so long. Hello take a look at this long ass string omg take a"
+    " look at this string its so long."
+)
+print(long_str)
+
+longer_string = """test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test """
