@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 import data_preparation as dp
 
 
-def plot_specs(sn_data, ind, ncols=4, scale=4):
+def plot_specs(sn_data, ind, ncols=4, scale=4, xlim=(None, None)):
     # The function below neatly and reproducibly extracts all of the relevant
     # subsets of the dataframe.
     data = dp.extract_dataframe(sn_data)
@@ -34,7 +34,9 @@ def plot_specs(sn_data, ind, ncols=4, scale=4):
         axes[i].plot(wvl0, spectrum)
 
         axes[i].axhline(y=0, c="k", ls=":")
-
+        
+        axes[i].set_xlim(xlim)
+        
     fig.show()
 
 
@@ -119,8 +121,8 @@ def plot_loss(log, scale=8):
     # axes[0].set_ylim((None, None))
     axes[1].set_ylim((0, 0.99))
 
-    axes[0].legend(loc="upper right")
-    axes[1].legend(loc="lower right")
+    axes[0].legend(loc="lower left")
+    axes[1].legend(loc="upper left")
 
     axes[0].grid()
     axes[1].grid()
@@ -283,7 +285,7 @@ def wavelen2rgb(nm):
     return (adjust(red, factor), adjust(green, factor), adjust(blue, factor))
 
 
-def plotSpec(wvl, flux, err=None, save=None):
+def plot_spec(wvl, flux, scale=8, err=None, save=None):
     """
     Plot a spectrum with appropriate colors.
 
@@ -327,7 +329,7 @@ def plotSpec(wvl, flux, err=None, save=None):
 
     wvl_LE = adjust_logbins(wvl)
 
-    fig, ax = plt.subplots(figsize=(20, 10))
+    fig, ax = plt.subplots(figsize=(2 * scale, 1 * scale))
 
     if err is not None:
         ax.errorbar(
@@ -341,7 +343,7 @@ def plotSpec(wvl, flux, err=None, save=None):
             marker="*",
         )
     else:
-        ax.plot(wvl[:-1], flux[:-1], ls="-", c="k", marker="*")
+        ax.plot(wvl[:-1], flux[:-1], ls="", c="k", marker="")
     _, _, patches = ax.hist(wvl_LE[:-1], bins=wvl_LE, weights=flux[:-1], align="mid")
 
     # Each patch of the histogram (the rectangle underneath each point) gets
@@ -415,45 +417,47 @@ def adjust_logbins(bins, current="center", new="leftedge"):
     return new_bins
 
 
-def plot_cm(
-    cm, classes, R, normalize=True, figsize=(12, 9), fontsize_offset=5, savepath=None
-):
-    """Normalize confusion matrix and set image parameters"""
+def plot_cm(cm, classes, R, title=False):
+    textargs = {"fontname": "Serif"}
+    
+    # Normalize confusion matrix and set image parameters
     cm = cm.astype("float") / np.nansum(cm, axis=1)[:, np.newaxis]
     off_diag = ~np.eye(cm.shape[0], dtype=bool)
     cm[off_diag] *= -1
-    vmin, vmax = -1, 1
-    cmap = "RdBu"
 
-    fig = plt.figure(figsize=figsize)
-    plt.imshow(cm, interpolation="None", cmap=cmap, vmin=vmin, vmax=vmax)
-
-    plt.title(f"R = {R}")
-
-    cb = plt.colorbar()
-    cb.ax.tick_params(labelsize=23 - fontsize_offset)
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    im = ax.imshow(cm, interpolation="none", cmap="RdBu", vmin=-1, vmax=1)
+    
+    cbticks = np.linspace(-1, 1, num=9)
+    cbticklabels = ["100%", "75%", "50%", "25%", "0%", "25%", "50%", "75%", "100%"]
+    cb = plt.colorbar(im, shrink=0.82)
+    cb.set_ticks(cbticks, labels=cbticklabels, fontsize= 12, **textargs)
+    
+    if title:
+        ax.set_title(f"R = {R}", **textargs, fontsize=15)
 
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=90, fontsize=15 - fontsize_offset)
-    plt.yticks(tick_marks, classes, fontsize=15 - fontsize_offset)
+    ax.set_xticks(tick_marks, classes, rotation=90, **textargs, fontsize= 14)
+    ax.set_yticks(tick_marks, classes, **textargs, fontsize= 14)
 
-    fmt = ".2f" if normalize else "d"
-    thresh = cm.max() / 2.0
-    import itertools
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            val = np.abs(cm[i, j])
+            if val == 0:
+                text = ""
+            elif val == 1:
+                text = "100"
+            else:
+                text = f"{val*100:.1f}"
+            color = "w" if val >= 0.50 else "k"
+            ax.text(
+                j, i, text,
+                ha="center", va="center",
+                c=color, **textargs, fontsize=11,
+            )
 
-    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(
-            j,
-            i,
-            format(abs(cm[i, j]), fmt),
-            horizontalalignment="center",
-            color="white" if abs(cm[i, j]) > thresh else "black",
-            fontsize=18 - fontsize_offset,
-        )
-
-    plt.tight_layout()
-    plt.ylabel("True label", fontsize=26 - fontsize_offset)
-    plt.xlabel("Predicted label", fontsize=26 - fontsize_offset)
-    plt.tight_layout()
-    # plt.savefig(savepath)
-    plt.show()
+    ax.set_ylabel("True label", fontsize=20, **textargs)
+    ax.set_xlabel("Predicted label", fontsize=20, **textargs)
+    
+    return fig

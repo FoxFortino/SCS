@@ -110,10 +110,10 @@ def run_SCS(dir_model, R, hp, file_raw_data=None, resume=False):
     results = evaluate(model, Xtrn, Ytrn, Xtst, Ytst, verbose=0)
     write_json(results, file_model_results)
     
-    log = pd.read_csv(file_model_history)
-    fig = dplt.plot_loss(log)
-    fig.savefig(file_model_curves)
-    fig.clf()
+    # log = pd.read_csv(file_model_history)
+    # fig = dplt.plot_loss(log)
+    # fig.savefig(file_model_curves)
+    # fig.clf()
 
 
 def load_SCS_model(file_model, file_model_hp):

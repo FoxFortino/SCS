@@ -54,11 +54,11 @@ def T0():
     hp["encoder_heads"] = 8
     hp["encoder_key_dim"] = 32
     hp["encoder_proj_dim"] = 512
-    hp["encoder_dropout_attention"] = 0.1
-    hp["encoder_dropout_projection"] = 0.1
+    hp["encoder_dropout_attention"] = 0.3
+    hp["encoder_dropout_projection"] = 0.3
     hp["feed_forward_units"] = [1024, 1024, 1024]
     hp["feed_forward_activation"] = "relu"
-    hp["feed_forward_dropout"] = 0.1
+    hp["feed_forward_dropout"] = 0.3
 
     # ----- Reformat dictionary ----- #
     hp = {key: [val] for key, val in hp.items()}

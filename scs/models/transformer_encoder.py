@@ -22,7 +22,7 @@ def model(
     for _ in range(encoder_blocks):
         x = transformer_block(
             x,
-            input_shape[1],
+            input_shape,
             encoder_heads,
             encoder_key_dim,
             encoder_proj_dim,
@@ -30,7 +30,7 @@ def model(
             encoder_dropout_projection,
         )
 
-    x = layers.GlobalMaxPooling1D(data_format="channels_last")(x)
+    x = layers.GlobalMaxPooling1D(data_format="channels_first")(x)
     for n in feed_forward_units:
         x = layers.Dense(n, activation=feed_forward_activation)(x)
         x = layers.Dropout(feed_forward_dropout)(x)
@@ -43,7 +43,7 @@ def model(
 
 def transformer_block(
     x,
-    num_wvls,
+    input_shape,
     heads,
     key_dim,
     encoder_proj_dim,
@@ -55,13 +55,15 @@ def transformer_block(
     x0 = layers.Add()([x, x0])
     x0 = layers.LayerNormalization()(x0)
 
+
     x1 = layers.Conv1D(
         filters=encoder_proj_dim,
         kernel_size=1,
         activation="relu",
     )(x0)
+
     x1 = layers.Conv1D(
-        filters=num_wvls,
+        filters=input_shape[1],
         kernel_size=1,
         activation="relu",
     )(x1)
