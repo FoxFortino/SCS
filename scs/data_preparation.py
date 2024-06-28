@@ -7,6 +7,24 @@ from numpy import typing as npt
 import pandas as pd
 
 
+def load_dataset(file_df):
+    df = pd.read_parquet(file_df)
+    return df
+
+def save_noise_dataset(data, testing=False):
+    if testing:
+        np.save("../data/raw/snnoise_TESTING.npy", data)
+    else:
+        np.save("../data/raw/snnoise.npy", data)
+
+def read_noise_dataset():
+    return np.load("../data/raw/snnoise.npy")
+def save_clean_dataset(df, testing=False):
+    if testing:
+        df.to_parquet("../data/raw/sn_clean_TESTING.parquet")
+    else:
+        df.to_parquet("../data/raw/sn_clean.parquet")
+
 def extract_dataframe(sn_data):
     """
     Extract both metadata and flux data from a dataframe.
@@ -52,12 +70,8 @@ def preproccess_dataframe(
     # The function below neatly and reproducibly extracts all of the relevant 
     # subsets of the dataframe.
     data = extract_dataframe(sn_data)
-    index = data[0]  # SN Name for each spectrum
     wvl0 = data[1]  # Wavelength array
     flux0_columns = data[2]  # Columns that index the fluxes in the dataframe
-    metadata_columns = data[3]  # Columns that index the metadata
-    df_fluxes0 = data[4]  # Sub-dataframe containing only the fluxes
-    df_metadata = data[5]  # Sub-dataframe containing only the metadata
     fluxes0 = data[6]  # Only the flux values in a numpy array
 
     # Spectra with a spectral phase outside of `phase_range`.

@@ -7,9 +7,10 @@ from numpy import typing as npt
 import pandas as pd
 
 import data_preparation as dp
+CONST = (2 * np.sqrt(2 * np.log(2)))
 
-
-def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None):
+def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None,
+                      plot=False):
     if (save_path_C is not None) and (save_path_R is not None):
         if not isdir(dirname(save_path_R)):
             raise FileNotFoundError(f"Directory '{dirname(save_path_R)}' does not exist.")
@@ -22,12 +23,10 @@ def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None):
     index = data[0]  # SN Name for each spectrum
     wvl0 = data[1]  # Wavelength array
     flux0_columns = data[2]  # Columns that index the fluxes in the dataframe
-    metadata_columns = data[3]  # Columns that index the metadata
-    df_fluxes0 = data[4]  # Sub-dataframe containing only the fluxes
     df_metadata = data[5]  # Sub-dataframe containing only the metadata
     fluxes0 = data[6]  # Only the flux values in a numpy array
 
-    # Perform degradation for each spectrum in the dataset. The function
+    # Perform degradation (i.e. lowers resolution) for each spectrum in the dataset. The function
     # degraded_spectrum is vectorized, so supplying multiple spectrum allows
     # the operation to be parallelized.
     fluxes_convolve, wvl_degraded, fluxes_degraded = degrade_spectrum(
@@ -53,7 +52,16 @@ def degrade_dataframe(R, sn_data, save_path_C=None, save_path_R=None):
         print(f"Saved: {save_path_C}")
         sn_data_degraded.to_parquet(save_path_R)
         print(f"Saved: {save_path_R}")
+    if plot:
+        import matplotlib.pylab as plt
+        plt.plot(flux0_columns.astype(float),
+                 sn_data_convolve.iloc[:1].loc[:,flux0_columns].T,
+                 label="convolved")
 
+        plt.plot(degraded_flux_columns.astype(float),
+                 sn_data_degraded.iloc[:1].loc[:, degraded_flux_columns].T,
+                 label="lower res")
+        plt.show()
     return sn_data_convolve, sn_data_degraded
 
 
@@ -61,7 +69,7 @@ def degrade_spectrum(
     R,
     wvl0,
     flux0,
-    wvl_range=(2500, 10_000),
+    wvl_range=(2_500, 10_000),
     ):
     """
     Degrade the spectral resolution of one spectrum (wvl0 and flux0) to R.
@@ -91,7 +99,7 @@ def degrade_spectrum(
     """
     # Calculate the spectral resolution, R, of the original data.
     R_current = np.mean(wvl0[:-1] / np.diff(wvl0))
-    assert R < R_current
+    assert R < R_current, "cannot make resolution higher, pass a different R"
 
     # Get the new wavelength bins defined by R.
     wvl, wvl_bin_sizes = calc_new_wvl(R, wvl0, wvl_range)
@@ -99,12 +107,12 @@ def degrade_spectrum(
     # Need the bin sizes of the existing array which we can calculate in a
     # roundabout way with the calc_new_wvl function.
     tmp_wvl, wvl0_bin_sizes = calc_new_wvl(R_current, wvl0, wvl_range)
-    assert np.all(np.isclose(tmp_wvl, wvl0))
+    assert np.all(np.isclose(tmp_wvl, wvl0)), "something weird w wavelength bins "
 
     # As we convolve a Gaussian with the current fluxes, the standard
     # deviation of the Gaussian should be proportional to the wavelength bin
     # sizes with constant of proportionality R_current / R.
-    sd_arr = wvl0_bin_sizes * (R_current / R) / (2 * np.sqrt(2 * np.log(2)))
+    sd_arr = wvl0_bin_sizes * (R_current / R) / CONST
 
     # Perform the convolution
     flux_conv = special_convolution(wvl0, flux0, wvl0, sd_arr)
@@ -132,10 +140,10 @@ def calc_new_wvl(R, wvl0, wvl_range):
     # This code assumes that the center of the bins corresponds to halfway (in
     # linear space, not log space) between the left edge and right edge of the
     # bin.
-    wvl = (wvl_left_edge[1:] + wvl_left_edge[:-1]) / 2
+    wvl = (wvl_left_edge[1:] + wvl_left_edge[:-1]) * 0.5
 
     new_R = np.mean(wvl / wvl_bin_sizes)
-    assert np.isclose(R, new_R, rtol=0, atol=1)
+    assert np.isclose(R, new_R, rtol=0, atol=1), "cannot use the R given"
 
     return wvl, wvl_bin_sizes
 
@@ -158,6 +166,7 @@ def special_convolution(wvl0, flux0, mu, sigma):
     flux_conv = np.trapz(flux0 * weight, x=wvl0)
 
     return flux_conv
+
 special_convolution = np.vectorize(special_convolution,
                                    signature="(n),(n),(),()->()")
 

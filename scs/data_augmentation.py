@@ -9,6 +9,8 @@ from scipy.signal import savgol_filter
 
 import data_preparation as dp
 
+from icecream import ic
+
 
 def augment(
     sn_data,
@@ -56,8 +58,8 @@ def augment(
         masked_wvl0 = wvl0[~wvl_range_mask]
 
         # Generate noise to augment the data
-        # masked_noise = gen_noise(masked_fluxes, noise_scale, rng)
-        masked_noise = 0
+        masked_noise = gen_noise(masked_fluxes, noise_scale, rng)
+        # masked_noise = 0
 
         # Generate spikes to augment the data
         masked_spikes = gen_spikes(
@@ -79,7 +81,7 @@ def augment(
 
 
 def gen_noise(spectrum, noise_scale, rng):
-    filt = savgol_filter(spectrum, 10, 1, mode="mirror")
+    filt = savgol_filter(spectrum, 11, 1, mode="mirror")
     res = spectrum - filt
     noise = res * noise_scale
     return noise
@@ -102,6 +104,7 @@ def gen_spikes(spectrum, wvl, spike_scale, max_spikes, rng):
 
     std = spectrum.std()
     scale = std * spike_scale
+
     spike_mag = stats.norm.rvs(loc=0, scale=scale, size=num_spikes, random_state=rng)
 
     spikes = np.zeros_like(spectrum)
