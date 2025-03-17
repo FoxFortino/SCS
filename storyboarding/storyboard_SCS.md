@@ -1,4 +1,4 @@
-# Paper 2: Novel Classification Method For Supernova Subtype Classification
+# Attention-Based Supernova Subtype Classification
 
 <img src="SNe_over_time.jpg" alt="Figure 1" width="300"/>
 
@@ -8,25 +8,25 @@
 
 <img src="treemap.jpg" alt="Figure 2" width="300"/>
 
-### Figure 2: A 'treemap' plot showing the number of spectra in our dataset for each SN type. The area of each rectangle is proportional to the number of spectra. Blue, orange, green and magenta rectangles denote SN spectra with broadtype Ia, Ib, Ic, and II, respectively.
+### Figure 2 [PLACEHOLDER, remade with the correct SN subtypes and with a better color scheme]: A 'treemap' plot showing the number of spectra in our dataset for each SN type. The area of each rectangle is proportional to the number of spectra. Blue, orange, green and magenta rectangles denote SN spectra with broadtype Ia, Ib, Ic, and II, respectively.
 
 ***
 
-<img src="Fig2_from_Villar_et_al_2023.png" alt="Figure 2" width="300"/>
+<img src="data_table.png" alt="Table 1" width="300"/>
 
-### Table 1 (or maybe a figure??): Right now this is Figure 2 from Villar et al 2023, the paper that discusses the hierarchical cross entropy loss. I am not sure how we should truly be re-categorizing the SNe so I am putting this here for now.
+### Table 1[PLACEHOLDER, remade with the correct SN subtypes]: This table shows the distribution of the number of supernova spectra, not supernova, across each of 17 supernova types. The first column shows the data distribution of the spectra we collected before any pre-processing. The second column shows the data distribution after the pre-processing steps which remove some known bad spectra and some spectra that are poor SNR. The third and fifth columns shows the distribution of a typical training and testing set split. The fourth column shows the final distribution of the training set after the data augmentation techniques have been applied. Note how now each class is represented approximately evenly. Finally, note that no II-pec spectra make it into the model because we only had one supernova (SN1987A) of that type.
 
 ***
 
 <img src="sn1998dt_spectra.jpg" alt="Figure 3" width="300"/>
 
-### Figure 3: A spectrum from SN1998dt, Type Ib, observed 1.8 days after peak brightness. The blackbody continuum has been removed. Type Ib SNe do not show hydrogen spectral lines nor the Siii line at 6355A that characterizes SNe Ia. (Top) The spectrum is plotted at the original high-resolution of R = 738. (Middle) The spectrum is plotted at the low-resolution of R = 100, the same resolution that the SEDM operates at. (Bottom) The spectrum is plotted at the ultra low-resolution of R = 24.
+### Figure 3 [I would like to remake this with potentially a different supernova but also removing the black line and just overall revisiting this plot since its beena a while since I've : A spectrum from SN1998dt, Type Ib, observed 1.8 days after peak brightness. The blackbody continuum has been removed. Type Ib SNe do not show hydrogen spectral lines nor the Siii line at 6355A that characterizes SNe Ia. (Top) The spectrum is plotted at the original high-resolution of R = 738. (Middle) The spectrum is plotted at the low-resolution of R = 100, the same resolution that the SEDM operates at. (Bottom) The spectrum is plotted at the ultra low-resolution of R = 24.
 
 ***
 
 <img src="placeholder_transformer architecture.jpg" alt="Figure 3" width="300"/>
 
-### Figure 4: PLACEHOLDER Transformer architecture
+### Figure 4: A figure that visualizes the architecture of the model that we are proposing. The image should show any higher-dim embedding step as well as 
 
 ***
 
