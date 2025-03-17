@@ -42,7 +42,7 @@ Placeholder: I want to remove the black line at least in the bottom panel, maybe
 
 Placeholder: This figure needs the most work, I will probably have to make it in a special program rather than doing it automatically from some website. Either way, it should include the higher-dim embedding stage (if its in the final model) and it should include the PE (if it's in the final model)
 
-### Figure 4: A figure that visualizes the architecture of the model that we are proposing. The image should show any higher-dim embedding step as well as 
+### Figure 5: A figure that visualizes the architecture of the model that we are proposing. This architecture should show everything from the input of the model, including any positional encoding, following the transformer encoder layers (they should be shown too) and then following that the feed forward classification head.
 
 ***
 
