@@ -38,7 +38,7 @@ Placeholder: I want to remove the black line at least in the bottom panel, maybe
 
 ***
 
-<img src="placeholder_transformer architecture.jpg" alt="Figure 3" width="300"/>
+<img src="placeholder_transformer architecture.jpg" alt="Figure 5" width="300"/>
 
 Placeholder: This figure needs the most work, I will probably have to make it in a special program rather than doing it automatically from some website. Either way, it should include the higher-dim embedding stage (if its in the final model) and it should include the PE (if it's in the final model)
 
@@ -46,16 +46,26 @@ Placeholder: This figure needs the most work, I will probably have to make it in
 
 ***
 
-<img src="placeholder_model_training_prep_params.jpg" alt="Figure 3" width="300"/>
+<img src="placeholder_model_training_prep_params.jpg" alt="Table 2" width="300"/>
 
-### Table 2: Hyperparameters for the model, the training, and the preprocessing steps
+### Table 2: All hyperparamteres related to the model. Not much to be said here?
+
+***
+
+<img src="placeholder_loss_curve.jpg" alt="Figure 6a" width="300"/>
+
+<img src="cm.jpg" alt="Figure 6b" width="300"/>
+
+Figure 6: DASH training with new data and fixed train-test-split. (a) Loss and metrics. (b) Confusion matrix on testing set
 
 ***
 
-<img src="placeholder_loss_curve.jpg" alt="Figure 3" width="300"/>
-
-### Figure 5: Transformer and DASH training/validation loss curves at R = 100.
+<img src="placeholder_loss_curve.jpg" alt="Figure 7a" width="300"/>
+<img src="cm.jpg" alt="Figure 7b" width="300"/>
+Figure 7: New model (a) Loss and metrics. (b) Confusion matrix on testing set.
 
 ***
+
+
 
 ### Figure 6+: Confusion Matrices for the various models
